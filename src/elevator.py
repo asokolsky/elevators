@@ -34,7 +34,16 @@ class ElevatorState(str, Enum):
     Possible values of the Elevator State
     '''
 
+    # low power state for an empty elevator with closed doors
     IDLE = 'idle'
+    # with or without load
+    DOORS_OPENING = 'doors-opening'
+    # with or without load
+    DOORS_CLOSING = 'doors-opening'
+    # moving to a destination floor with or without load
+    GOING = 'going'
+    # with or without load
+    DOORS_OPENED = 'doors-opened'
 
     @classmethod
     def is_valid(cls, st: Union[str, 'ElevatorState']) -> bool:
@@ -104,3 +113,6 @@ class Elevator:
         Object print representation
         '''
         return f"<{type(self).__qualname__} {self.state} at {self.current_floor} {self.panel.get_annotated_labels()} at {hex(id(self))}>"
+
+    def floor_call(floor: int) -> None:
+        return

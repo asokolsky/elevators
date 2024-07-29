@@ -1,15 +1,16 @@
 '''
 All the button-related stuff
 '''
-from typing import Callable, List
+from typing import Callable, List, Optional
 
 
 class Button:
     '''
     Simple (stateless) push button
     '''
+    callback: Optional[Callable] = None
+    enabled = True   # in position to respond to clicks
     label = ''
-    callback = None
 
     def __init__(self, label: str, callback: Callable) -> None:
         '''
@@ -19,13 +20,23 @@ class Button:
         self.label = label
         return
 
-    def click(self) -> None:
+    def enable(self) -> None:
+        self.enabled = True
+        return
+
+    def disable(self) -> None:
+        self.enabled = False
+        return
+
+    def click(self) -> bool:
         '''
         Definitive button action to be called by users.
         Activate button press and release, on release, I guess.
         '''
+        if not self.enabled:
+            return False
         self.on_click()
-        return
+        return True
 
     def on_click(self) -> None:
         '''
@@ -35,11 +46,19 @@ class Button:
             self.callback(self)
         return
 
+    def get_annotated_label(self) -> str:
+        '''
+        Return the label representing enabled/disabled status
+        '''
+        if self.enabled:
+            return self.label
+        return f'_{self.label}_'
+
     def __repr__(self) -> str:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} '{self.label}' at {hex(id(self))}>"
+        return f"<{type(self).__qualname__} '{self.get_annotated_label()}' at {hex(id(self))}>"
 
 class ButtonWithLed(Button):
     '''
@@ -75,15 +94,20 @@ class ButtonWithLed(Button):
         '''
         return self.led_on
 
+    def get_annotated_label(self) -> str:
+        '''
+        Return the label representing led on/of, enabled/disabled status
+        '''
+        alabel = super().get_annotated_label()
+        if self.led_on:
+            alabel = '*' + alabel + '*'
+        return alabel
+
     def __repr__(self) -> str:
         '''
         Object print representation
         '''
-        if self.led_on:
-            annotated_label = '*' + self.label + '*'
-        else:
-            annotated_label = self.label
-        return f"<{type(self).__qualname__} '{annotated_label}' at {hex(id(self))}>"
+        return f"<{type(self).__qualname__} '{self.get_annotated_label()}' at {hex(id(self))}>"
 
 class ButtonWithLedPanel:
     '''
@@ -128,10 +152,7 @@ class ButtonWithLedPanel:
         ]
 
     def get_annotated_labels(self) -> List[str]:
-        return [
-            (button.is_on() and f'*{button.label}*') or button.label
-                for button in self.buttons
-        ]
+        return [button.get_annotated_label() for button in self.buttons]
 
     def __repr__(self) -> str:
         '''

@@ -34,13 +34,33 @@ class TestButton(unittest.TestCase):
         '''
         Test Button functionality
         '''
+        #
+        # verify clicks go through
+        #
         clicks_old = self.clicks
         self.button.click()
         self.assertEqual(self.clicks,  clicks_old + 1)
-
+        #
+        # verify clicks do NOT go through when button is disabled
+        #
+        clicks_old = self.clicks
+        self.button.disable()
+        self.button.click()
+        self.assertEqual(self.clicks,  clicks_old)
+        #
+        # verify enabled button representation
+        #
+        self.button.enable()
         self.assertEqual(
             self.button.__repr__(),
             f"<Button '{self.button_label}' at {hex(id(self.button))}>")
+        #
+        # verify disabled button representation
+        #
+        self.button.disable()
+        self.assertEqual(
+            self.button.__repr__(),
+            f"<Button '_{self.button_label}_' at {hex(id(self.button))}>")
         return
 
 
@@ -76,12 +96,24 @@ class TestButtonWithLed(unittest.TestCase):
         self.assertEqual(
             self.button.__repr__(),
             f"<ButtonWithLed '{self.button_label}' at {hex(id(self.button))}>")
-
+        #
+        # verify clicks go through
+        #
         self.button.click()
         self.assertTrue(self.button.is_on())
         self.assertEqual(
             self.button.__repr__(),
             f"<ButtonWithLed '*{self.button_label}*' at {hex(id(self.button))}>")
+        #
+        # verify clicks do NOT go through when disabled
+        #
+        self.button.disable()
+        self.button.click()
+        self.assertTrue(self.button.is_on())
+        self.assertEqual(
+            self.button.__repr__(),
+            f"<ButtonWithLed '*_{self.button_label}_*' at {hex(id(self.button))}>")
+
         return
 
 class TestButtonWithLedPanel(unittest.TestCase):
@@ -123,6 +155,24 @@ class TestButtonWithLedPanel(unittest.TestCase):
         self.assertEqual(
             self.panel.get_annotated_labels(),
             ['1', '2', '*3*', '4', '*5*'])
+
+        self.panel.buttons[0].disable()
+        self.panel.buttons[4].disable()
+        self.assertEqual(
+            self.panel.get_annotated_labels(),
+            ['_1_', '2', '*3*', '4', '*_5_*'])
+        #
+        # verify click on a disabled button has no effect
+        #
+        self.panel.click(4)
+        self.assertEqual(
+            self.panel.get_annotated_labels(),
+            ['_1_', '2', '*3*', '4', '*_5_*'])
+        #
+        # verify click on enabled button has no effect
+        #
+        self.panel.buttons[0].enable()
+        self.panel.buttons[4].enable()
         self.panel.click(4)
         self.assertEqual(self.panel.get_leds_on(), [2])
         self.assertEqual(
