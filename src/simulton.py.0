@@ -1,0 +1,74 @@
+'''
+A simulation is a simulation entity with REST API.
+It has nothing to do with https://ogden.eu/simultons/
+'''
+from enum import Enum
+from multiprocessing import JoinableQueue, Process, Queue
+from typing import Union
+
+
+class SimultonState(str, Enum):
+    '''
+    Possible values of the Simulton state
+    '''
+    INIT = 'init'
+    RUNNING = 'running'
+    PAUSED = 'paused'
+    SHUTTING = 'shutting'
+
+    @classmethod
+    def is_valid(cls, st: Union[str, 'SimultonState']) -> bool:
+        '''
+        Valid value recognizer
+        '''
+        return st in SimultonState._value2member_map_
+
+    def __repr__(self):
+        '''
+        To enable serialization as a string...
+        '''
+        return repr(self.value)
+
+
+class Simulton(Process):
+    '''
+    Simulation entity which uses:
+      * python IPC for the lifecycle and rate control;
+      * REST APIs for domain APIs.
+    '''
+
+    state: SimultonState = SimultonState.INIT
+
+    def __init__(
+            self, commands: JoinableQueue, results: Queue, label: str) -> None:
+        super().__init__(name=label)
+        self.commands = commands
+        self.results = results
+        self.name = label
+        self.state = SimultonState.INIT
+        return
+
+    def __repr__(self) -> str:
+        '''
+        Simulton print representation
+        '''
+        return f"<{type(self).__qualname__} {self.name} in {self.state} " \
+               f"at {hex(id(self))}>"
+
+    def run(self):
+        self.state = SimultonState.RUNNING
+
+        while True:
+            cmd = self.commands.get()
+            if cmd is None:
+                # Poison pill means shutdown
+                break
+            print(f'{self.name}: {cmd}')
+            answer = cmd()
+            self.commands.task_done()
+            self.results.put(answer)
+
+        self.state = SimultonState.RUNNING
+        self.commands.task_done()
+        print(f'{self.name}: exiting')
+        return

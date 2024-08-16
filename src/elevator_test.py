@@ -2,9 +2,9 @@
 Testing the elevator-related stuff
 '''
 import unittest
-from typing import List
 
-from .elevator import Elevator # [relative-beyond-top-level]
+from .elevator import Elevator  # [relative-beyond-top-level]
+
 
 class TestElevator(unittest.TestCase):
     '''
@@ -25,6 +25,7 @@ class TestElevator(unittest.TestCase):
         '''
         print(self.el)
         return
+
 
 
 if __name__ == '__main__':
