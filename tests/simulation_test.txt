@@ -30,7 +30,3 @@ class TestSimulation(unittest.TestCase):
         #world.run(10)
         #world.shutdown()
         return
-
-
-if __name__ == '__main__':
-    unittest.main()

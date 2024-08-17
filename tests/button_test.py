@@ -1,10 +1,10 @@
 '''
 Testing all the button-related stuff
 '''
+from elevators import Button, ButtonWithLed, ButtonWithLedPanel
+
 import unittest
 from typing import List
-
-from .button import Button, ButtonWithLed, ButtonWithLedPanel  # [relative-beyond-top-level]
 
 
 class TestButton(unittest.TestCase):

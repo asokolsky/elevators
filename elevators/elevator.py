@@ -100,6 +100,13 @@ class Elevator:
         #
         return
 
+    @property
+    def name(self) -> str:
+        '''
+        just get the name
+        '''
+        return self._name
+
     def step_in(self, kilos: int) -> bool:
         '''
         passenger of weight kilos steps in
@@ -146,8 +153,8 @@ class Elevator:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} {self._state} " \
-            f"at {self._current_floor} {self._panel.annotated_labels} " \
+        return f"<{type(self).__qualname__} {self._name} is {self._state} " \
+            f"on {self._current_floor} floor {self._panel.annotated_labels} " \
             f"at {hex(id(self))}>"
 
     def floor_call(self, floor: int) -> None:

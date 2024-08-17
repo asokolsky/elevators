@@ -31,8 +31,8 @@ $(VENV)/bin/activate: requirements.txt
 run: venv									## Execute python program
 	$(PYTHON) src/main.py $(SITE)
 
-test: venv									## Execute python tests
-	$(PYTHON) -m unittest -v src/*_test.py
+tests: venv									## Execute python tests
+	$(PYTHON) -m unittest -v tests/*_test.py
 
 clean:										## Cleanup the artifacts
 	rm -rf $(VENV) .mypy_cache

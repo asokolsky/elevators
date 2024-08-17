@@ -3,7 +3,7 @@ Testing the elevator-related stuff
 '''
 import unittest
 
-from .elevator import Elevator  # [relative-beyond-top-level]
+from elevators import Elevator
 
 
 class TestElevator(unittest.TestCase):
@@ -25,8 +25,3 @@ class TestElevator(unittest.TestCase):
         '''
         print(self.el)
         return
-
-
-
-if __name__ == '__main__':
-    unittest.main()

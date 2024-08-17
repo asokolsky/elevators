@@ -1,7 +1,7 @@
 '''
 All the button-related stuff
 '''
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 
 class Button:
