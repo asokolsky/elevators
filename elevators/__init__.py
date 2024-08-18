@@ -8,6 +8,7 @@ from .elevator import Elevator
 from .elevator_simulton import app, NewElevatorParams, ElevatorResponse, \
     Message
 
+__version__ = "0.0.1"
 
 __all__ = [
     # button.py

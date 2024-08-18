@@ -1,6 +1,6 @@
 # Inside Elevator
 
-Single elevator interfaces - both human and APIs
+A single elevator has the following interfaces - both human and APIs...
 
 ## Controls
 
