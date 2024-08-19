@@ -7,6 +7,7 @@ from .button import Button, ButtonWithLed, ButtonWithLedPanel
 from .elevator import Elevator
 from .elevator_simulton import app, NewElevatorParams, ElevatorResponse, \
     Message
+from .restc import rest_client
 
 __version__ = "0.0.1"
 
@@ -21,5 +22,7 @@ __all__ = [
     'ElevatorResponse',
     'Message',
     # elevator.py
-    'Elevator'
+    'Elevator',
+    # restc.py
+    rest_client
 ]

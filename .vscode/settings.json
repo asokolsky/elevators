@@ -5,6 +5,7 @@
         "Simulton",
         "simultons"
     ],
+    "makefile.configureOnOpen": false,
     "python.testing.unittestArgs": [
         "-v",
         "-s",
@@ -14,5 +15,11 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
-    "makefile.configureOnOpen": false
+    "terminal.integrated.defaultProfile.linux": "venv",
+    "terminal.integrated.profiles.linux": {
+        "venv": {
+            "path": "zsh", // works with "bash" too
+            "args": ["-c", "source .venv/bin/activate; zsh -i"]
+        }
+    }
 }
