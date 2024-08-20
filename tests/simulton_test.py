@@ -1,27 +1,11 @@
 '''
 Test launching/shutting FastAPI server programmatically
 '''
-import os
-import requests
-import signal
-import subprocess
-import time
 import unittest
+import requests
 
-from elevators import rest_client, NewElevatorParams, ElevatorResponse
+from elevators import rest_client, Service, NewElevatorParams, ElevatorResponse
 
-host = '127.0.0.1'
-port = 9000
-root = '/api/v1/elevators'
-
-command_line = [
-    'fastapi', 'run',
-    '--host', host,
-    '--port', str(port),
-    '--workers', str(1),
-    'elevators/elevator_simulton.py'
-    #'python3', '--help'
-]
 
 class TestElevatorSimulton(unittest.TestCase):
     '''
@@ -33,37 +17,20 @@ class TestElevatorSimulton(unittest.TestCase):
         '''
         Launch FastAPI process
         '''
-        print('setUpClass')
+        # print('setUpClass')
+        cls._service = Service('elevators/elevator_simulton.py', 9000)
         #
         # start the simulton process
         #
-        this_dir = os.path.dirname(os.path.realpath(__file__))
-        parent_dir = os.path.abspath(this_dir + '/..')
-        cls.popen = subprocess.Popen(
-            command_line, cwd=parent_dir,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        #
-        #
-        #
-        timeout = 5
-        time_to_timeout = time.time() + timeout
-        while time.time() < time_to_timeout:
-            time.sleep(0.1)
-            try:
-                # are we there yet?
-                x = requests.get(f'http://{host}:{9000}/')
-                pass
-                # YES!
-            except Exception as e:
-                # no
-                print('Caught', e)
-        assert time.time() < time_to_timeout
-        #
+        assert cls._service.launch()
+        assert cls._service.wait_until_reachable(10)
         #
         # create client
+        #
         verbose = True
-        dumpHeaders = True
-        cls.restc = rest_client(host, port, verbose, dumpHeaders)
+        dumpHeaders = False
+        cls.restc = rest_client(
+            cls._service.host, cls._service.port, verbose, dumpHeaders)
         return
 
     @classmethod
@@ -71,37 +38,32 @@ class TestElevatorSimulton(unittest.TestCase):
         '''
         Shut FastAPI process
         '''
-        print('tearDownClass')
+        # print('tearDownClass')
         cls.restc.close()
         #
         # shut the simulton process
         #
-        #cls.popen.terminate()
-        os.kill(cls.popen.pid, signal.SIGINT)
-        stdout_value, stderr_value = cls.popen.communicate()
-        print('========================= FastAPI stdout =========================')
-        print(stdout_value)
-        print('========================= FastAPI stderr =========================')
-        print(stderr_value)
+        cls._service.shutdown()
         return
 
     def setUp(self):
-        print('setUp', 'fastapi pid:', self.popen.pid)
+        # print('setUp', 'fastapi pid:', self.popen.pid)
         #
         # verify the FastAPI server is running
         #
         uri = '/'
         try:
             (status_code, rdata) = self.restc.get(uri)
-            print('status_code:', status_code)
-            print('rdata:', rdata)
+            # print('status_code:', status_code)
+            # print('rdata:', rdata)
+            self.assertEqual(status_code, 200)
         except requests.exceptions.ConnectionError as err:
             print('Caught:', err)
             self.assertFalse(err)
         return
 
     def tearDown(self):
-        print('tearDown')
+        # print('tearDown')
         return
 
     def test_all(self):
@@ -109,8 +71,9 @@ class TestElevatorSimulton(unittest.TestCase):
         This pretty much repeats elevator_simulton_test except a real HTTP
         communication is used, not test client.
         '''
-        print('test_all', 'fastapi pid:', self.popen.pid)
+        # print('test_all', 'fastapi pid:', self.popen.pid)
 
+        root = '/api/v1/simulation'
         try:
             (status_code, rdata) = self.restc.get(f'{root}/')
             self.assertTrue(status_code, 200)

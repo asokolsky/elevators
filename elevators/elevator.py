@@ -4,7 +4,7 @@ All the elevator-related stuff
 from enum import Enum
 from typing import List, Union
 
-from .button import ButtonWithLedPanel  # [relative-beyond-top-level]
+from . import ButtonWithLedPanel  # [relative-beyond-top-level]
 
 
 class LoadValue(str, Enum):

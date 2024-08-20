@@ -1,11 +1,9 @@
 '''
-Simulation launcher
+Simulation was created first.  It spawns and eventually shuts simultons.
 '''
 from enum import Enum
 import multiprocessing
 from typing import List, Union
-
-from simulton import Simulton      # [relative-beyond-top-level]
 
 
 class SimulationState(str, Enum):

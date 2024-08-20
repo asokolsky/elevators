@@ -1,6 +1,10 @@
-from requests import Session, Response
+'''
+REST client and other utilities
+'''
 from urllib.parse import urljoin
+import time
 from typing import Any, Optional, Tuple
+from requests import Session, Response, get
 
 
 class rest_client:
@@ -108,3 +112,24 @@ class rest_client:
         resp = self.ses.patch(url, json=data)
         self.print_resp('PATCH', resp)
         return (resp.status_code, resp.json())
+
+
+def wait_until_reachable(url: str, timeout: int) -> bool:
+    '''
+    Wait upto timeout secs until the url is reachable
+    '''
+    start = time.time()
+    time_to_timeout = start + timeout
+    while time.time() < time_to_timeout:
+        time.sleep(0.4)
+        try:
+            # are we there yet?
+            x = get(url)
+            if x.ok:
+                # YES!
+                print(f'wait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
+                return True
+        except Exception:
+            pass
+    print(f'wait_until_reachable({url}, {timeout}) => False')
+    return False
