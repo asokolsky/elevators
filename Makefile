@@ -29,7 +29,7 @@ $(VENV)/bin/activate: requirements.txt
 	$(PIP) install -r requirements.txt
 
 run: venv									## Execute python program
-	$(PYTHON) elevators/__main__.py $(SITE)
+	$(PYTHON) simultons/__main__.py $(SITE)
 
 tests: venv									## Execute python tests
 	$(PYTHON) -m unittest -v tests/*_test.py

@@ -4,7 +4,7 @@ Testing the simulation/simulton stuff
 import unittest
 import requests
 
-from elevators import rest_client, Service, \
+from simultons import rest_client, Service, \
     SimulationStateResponse
 
 

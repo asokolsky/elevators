@@ -1,3 +1,5 @@
 requests
 fastapi[standard]
+fastapi-restful
 httpx
+typing-inspect

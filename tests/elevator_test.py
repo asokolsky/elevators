@@ -3,7 +3,7 @@ Testing the elevator-related stuff
 '''
 import unittest
 
-from elevators import Elevator
+from simultons import Elevator
 
 
 class TestElevator(unittest.TestCase):

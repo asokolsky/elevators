@@ -8,7 +8,7 @@
 import unittest
 from json import loads
 
-from elevators import restc
+from simultons import restc
 
 
 class TestRestC(unittest.TestCase):

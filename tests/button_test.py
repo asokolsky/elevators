@@ -1,10 +1,10 @@
 '''
 Testing all the button-related stuff
 '''
-from elevators import Button, ButtonWithLed, ButtonWithLedPanel
-
 import unittest
 from typing import List
+
+from simultons import Button, ButtonWithLed, ButtonWithLedPanel
 
 
 class TestButton(unittest.TestCase):

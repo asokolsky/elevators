@@ -4,7 +4,7 @@ Test launching/shutting FastAPI server programmatically
 import unittest
 import requests
 
-from elevators import rest_client, Service, NewElevatorParams, ElevatorResponse
+from simultons import rest_client, Service, NewElevatorParams, ElevatorResponse
 
 
 class TestElevatorSimulton(unittest.TestCase):

@@ -1,7 +1,7 @@
 import unittest
 from fastapi.testclient import TestClient
 
-from elevators import app, NewElevatorParams, ElevatorResponse
+from simultons import app, NewElevatorParams, ElevatorResponse
 
 
 client = TestClient(app)

@@ -1,20 +1,21 @@
 '''
 All the elevator-related stuff
 '''
-from enum import Enum
+from enum import auto
 from typing import List, Union
+from fastapi_utils.enums import StrEnum
 
 from . import ButtonWithLedPanel  # [relative-beyond-top-level]
 
 
-class LoadValue(str, Enum):
+class LoadValue(StrEnum):
     '''
     Possible values of the elevator load
     '''
 
-    NONE = 'none'
-    SOME = 'some'
-    TOO_MUCH = 'too-much'
+    NONE = auto()
+    SOME = auto()
+    TOO_MUCH = auto()
 
     @classmethod
     def is_valid(cls, st: Union[str, 'LoadValue']) -> bool:
@@ -30,21 +31,21 @@ class LoadValue(str, Enum):
         return repr(self.value)
 
 
-class ElevatorState(str, Enum):
+class ElevatorState(StrEnum):
     '''
     Possible values of the Elevator State
     '''
 
     # low power state for an empty elevator with closed doors
-    IDLE = 'idle'
+    IDLE = auto()
     # with or without load
-    DOORS_OPENING = 'doors-opening'
+    DOORS_OPENING = auto()
     # with or without load
-    DOORS_CLOSING = 'doors-closing'
+    DOORS_CLOSING =  auto()
     # moving to a destination floor with or without load
-    GOING = 'going'
+    GOING =  auto()
     # with or without load
-    DOORS_OPENED = 'doors-opened'
+    DOORS_OPENED =  auto()
 
     @classmethod
     def is_valid(cls, st: Union[str, 'ElevatorState']) -> bool:
