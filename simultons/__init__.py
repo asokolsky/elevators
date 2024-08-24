@@ -3,12 +3,13 @@ Playing with FastAPI, pydantic while simulating elevators
 '''
 
 from .button import Button, ButtonWithLed, ButtonWithLedPanel
+from .restc import rest_client, wait_until_reachable
+from .fast_launcher import FastLauncher
 # order is important to avoid circular dependency!
 from .elevator import Elevator
 from .elevator_simulton import app, NewElevatorParams, ElevatorResponse, \
     Message
 from .clock_simulton import Clock
-from .restc import rest_client, wait_until_reachable
 from .service import Service
 from .simulation import Simulation, SimulationState, SimulationStateResponse
 
@@ -21,6 +22,8 @@ __all__ = [
     'ButtonWithLedPanel',
     # clock_simulton.py
     'Clock',
+    # fast_launcher.py
+    'FastLauncher',
     # elevator_simulton.py
     'app',
     'NewElevatorParams',

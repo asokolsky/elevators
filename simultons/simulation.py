@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Union
 from fastapi import FastAPI
 from pydantic import BaseModel, NonNegativeInt
+import zmq
 
 
 class SimulationState(str, Enum):
@@ -36,6 +37,11 @@ class Simulation:
     '''
     Simulation launcher
     '''
+    #_zspec = "tcp://*:5556"
+    #_zspec = "ipc:///var/run/sss"
+    _zspec = "ipc:///tmp/sss"
+
+
     def __init__(self) -> None:
         '''
         Initializer
@@ -43,6 +49,10 @@ class Simulation:
         self._state = SimulationState.INIT
         # start in paused
         self._rate = 0
+        # start zmq publisher
+        self._zcontext = zmq.Context()
+        self._zsocket = self._zcontext.socket(zmq.PUB)
+        self._zsocket.bind(self._zspec)
         return
 
     @property
@@ -54,6 +64,9 @@ class Simulation:
     def state(self, state: SimulationState) -> SimulationState:
         print(f'Simulation state {self._state} -> {state}')
         self._state = state
+        # share the sate update with the subscribers
+        self._zsocket.send_string(SimulationStateResponse(
+            state=self._state, rate=self._rate).model_dump())
         return self._state
 
     @property
@@ -120,6 +133,7 @@ async def get_state():
     return SimulationStateResponse(
         state=theSimulation.state, rate=theSimulation.rate).model_dump()
 
+
 @app.put('/state', response_model=SimulationStateResponse)
 async def put_state(req: SimulationStateRequest):
     '''
@@ -128,6 +142,7 @@ async def put_state(req: SimulationStateRequest):
     theSimulation.state = req.state
     return SimulationStateResponse(
         state=theSimulation.state, rate=theSimulation.rate).model_dump()
+
 
 @app.get('/rate', response_model=SimulationStateResponse)
 async def get_rate():

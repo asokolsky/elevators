@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 import time
 from typing import Any, Optional, Tuple
 from requests import Session, Response, get
-
+from requests.exceptions import JSONDecodeError
 
 class rest_client:
     '''
@@ -45,8 +45,11 @@ class rest_client:
 
     def print_resp(self, method: str, resp: Response) -> None:
         if self.verbose:
-            print('HTTP', method, '=>', resp.status_code, ',',
-                  str(resp.json()))
+            try:
+                jresp = resp.json()
+            except JSONDecodeError:
+                jresp = resp
+            print('HTTP', method, '=>', resp.status_code, ',', str(jresp))
         if self.dumpHeaders:
             print('HTTP Response Headers:')
             for h in resp.headers:
@@ -63,7 +66,11 @@ class rest_client:
         self.print_req('GET', url, None)
         resp = self.ses.get(url)
         self.print_resp('GET', resp)
-        return (resp.status_code, resp.json())
+        try:
+            jresp = resp.json()
+        except JSONDecodeError:
+            jresp = resp
+        return (resp.status_code, jresp)
 
     def post(self, uri: str, data: Any):
         '''
@@ -120,16 +127,18 @@ def wait_until_reachable(url: str, timeout: int) -> bool:
     '''
     start = time.time()
     time_to_timeout = start + timeout
+    print(f'wait_until_reachable({url}, {timeout})', end='', flush=True)
     while time.time() < time_to_timeout:
-        time.sleep(0.4)
+        time.sleep(0.1)
         try:
             # are we there yet?
             x = get(url)
             if x.ok:
                 # YES!
-                print(f'wait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
+                print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
                 return True
         except Exception:
+            print('.', end='', flush=True)
             pass
-    print(f'wait_until_reachable({url}, {timeout}) => False')
+    print(f'\nwait_until_reachable({url}, {timeout}) => False')
     return False

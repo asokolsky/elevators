@@ -5,14 +5,12 @@ FastAPI process launcher
 import os
 import signal
 import subprocess
-from typing import Optional
-
-from fastapi import FastAPI
-
-from . import wait_until_reachable
+import time
+from requests import get
+from requests.exceptions import RequestException
 
 
-class Service:
+class FastLauncher:
     '''
     FastAPI Service Launcher
     '''
@@ -26,7 +24,6 @@ class Service:
         self._port = port
         self._popen = None
         self._health_uri = 'docs'
-        self._app: Optional[FastAPI] = None
         return
 
     @property
@@ -39,22 +36,9 @@ class Service:
         '_port accessor'
         return self._port
 
-    def get_app(self) -> FastAPI:
-        '''
-        To be called by within the service itself
-        '''
-        if self._app is None:
-            self._app = FastAPI(
-                title='simulation',
-                description='Simulation API',
-                version='0.0.1',
-                root_path='/api/v1/simulation')
-        return
-
     def launch(self) -> int:
         '''
         start the FastAPI service process, returns service process pid
-        To be called by a client
         '''
         parent_dir = os.path.abspath(
             os.path.dirname(os.path.realpath(__file__)) + '/..')
@@ -69,18 +53,48 @@ class Service:
 
     def wait_until_reachable(self, timeout: int) -> bool:
         '''
-        give some breathing room for the process to start
-        To be called by a client
+        give some room for the process to start
         '''
-        return wait_until_reachable(
-            f'http://{self._host}:{self._port}/{self._health_uri}', timeout)
+        url = f'http://{self._host}:{self._port}/{self._health_uri}'
+        start = time.time()
+        time_to_timeout = start + timeout
+        print(f'wait_until_reachable({url}, {timeout})', end='', flush=True)
+        while time.time() < time_to_timeout:
+            try:
+                self._popen.wait(0.2)
+                # if we are here, this means the process has terminated
+                print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs, process terminated')
+                return False
+
+            except subprocess.TimeoutExpired:
+                print('.', end='', flush=True)
+
+            try:
+                # are we there yet?
+                x = get(url, timeout=0.01)
+                if x.ok:
+                    # YES!
+                    print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
+                    return True
+
+            except RequestException:
+                pass
+
+        print(f'\nwait_until_reachable({url}, {timeout}) => False')
+        return False
 
     def shutdown(self) -> bool:
         '''
         Stop the FastAPI service process
-        To be called by a client
         '''
-        os.kill(self._popen.pid, signal.SIGINT)
+        if self._popen.returncode is None:
+            try:
+                os.kill(self._popen.pid, signal.SIGINT)
+            except ProcessLookupError:
+                print('Failed to locate process:', self._popen.pid)
+        else:
+            print('FastAPI is already down, ec:', self._popen.returncode)
+
         stdout_value, stderr_value = self._popen.communicate()
         dashes = '==========================='
         print(dashes, 'FastAPI stdout', dashes)

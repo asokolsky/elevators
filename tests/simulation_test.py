@@ -4,7 +4,7 @@ Testing the simulation/simulton stuff
 import unittest
 import requests
 
-from simultons import rest_client, Service, \
+from simultons import rest_client, FastLauncher, \
     SimulationStateResponse
 
 
@@ -20,13 +20,15 @@ class TestSimulation(unittest.TestCase):
         '''
         Launch FastAPI process
         '''
-        # print('setUpClass')
-        cls._service = Service('elevators/simulation.py', 9000)
+        #print('setUpClass')
+        cls._service = FastLauncher('simultons/simulation.py', 9000)
         #
         # start the simulton process
         #
         assert cls._service.launch()
-        assert cls._service.wait_until_reachable(10)
+        if not cls._service.wait_until_reachable(3):
+            cls._service.shutdown()
+            assert False
         #
         #
         # create client
@@ -41,7 +43,7 @@ class TestSimulation(unittest.TestCase):
         '''
         Shut FastAPI process
         '''
-        # print('tearDownClass')
+        #print('tearDownClass')
         cls.restc.close()
         #
         # shut the simulton process
@@ -50,15 +52,15 @@ class TestSimulation(unittest.TestCase):
         return
 
     def setUp(self):
-        uri = '/docs'
-        try:
-            (status_code, rdata) = self.restc.get(uri)
-            # print('status_code:', status_code)
-            # print('rdata:', rdata)
-            self.assertEqual(status_code, 200)
-        except requests.exceptions.ConnectionError as err:
-            print('Caught:', err)
-            self.assertFalse(err)
+        #uri = '/state'
+        #try:
+        #    (status_code, rdata) = self.restc.get(uri)
+        #    # print('status_code:', status_code)
+        #    # print('rdata:', rdata)
+        #    self.assertEqual(status_code, 200)
+        #except requests.exceptions.ConnectionError as err:
+        #    print('Caught:', err)
+        #    self.assertFalse(err)
         return
 
     def tearDown(self):
@@ -69,20 +71,15 @@ class TestSimulation(unittest.TestCase):
         Poke into the application service APIs
         '''
         try:
-            (status_code, rdata) = self.restc.get('/docs')
-            self.assertTrue(status_code, 200)
-            print('rdata', rdata)
-            self.assertEqual(rdata, [])
-
             (status_code, rdata) = self.restc.get(f'{root}/state')
             self.assertTrue(status_code, 200)
-            print('rdata', rdata)
-            self.assertEqual(rdata, [])
+            expected = {'state': 'init', 'rate': 0}
+            self.assertEqual(rdata, expected)
 
             (status_code, rdata) = self.restc.get(f'{root}/rate')
             self.assertTrue(status_code, 200)
-            print('rdata', rdata)
-            self.assertEqual(rdata, [])
+            expected = {'state': 'init', 'rate': 0}
+            self.assertEqual(rdata, expected)
 
         except requests.exceptions.ConnectionError as err:
             print('Caught:', err)

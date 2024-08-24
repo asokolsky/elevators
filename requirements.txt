@@ -1,5 +1,7 @@
 requests
 fastapi[standard]
 fastapi-restful
+fastapi-utils
 httpx
 typing-inspect
+pyzmq
