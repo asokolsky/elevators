@@ -1,5 +1,5 @@
 '''
-Playing with FastAPI, pydantic while simulating elevators
+Playing with FastAPI, pydantic while simulating stuff
 '''
 
 from .button import Button, ButtonWithLed, ButtonWithLedPanel
@@ -9,9 +9,9 @@ from .fast_launcher import FastLauncher
 from .elevator import Elevator
 from .elevator_simulton import app, NewElevatorParams, ElevatorResponse, \
     Message
-from .clock_simulton import Clock
-from .service import Service
-from .simulation import Simulation, SimulationState, SimulationStateResponse
+from .clock import Clock
+from .simulation import Simulation, SimulationState, SimulationStateResponse, \
+    NewSimultonParams, SimultonResponse
 
 __version__ = "0.0.1"
 
@@ -20,7 +20,7 @@ __all__ = [
     'Button',
     'ButtonWithLed',
     'ButtonWithLedPanel',
-    # clock_simulton.py
+    # clock.py
     'Clock',
     # fast_launcher.py
     'FastLauncher',
@@ -35,9 +35,11 @@ __all__ = [
     'rest_client',
     'wait_until_reachable',
     # service.py
-    'Service',
+    #'Service',
     # simulation.py
     'Simulation',
     'SimulationState',
-    'SimulationStateResponse'
+    'SimulationStateResponse',
+    'NewSimultonParams',
+    'SimultonResponse'
 ]

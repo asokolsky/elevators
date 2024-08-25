@@ -7,27 +7,6 @@ from multiprocessing import JoinableQueue, Process, Queue
 from typing import Union
 
 
-class SimultonState(str, Enum):
-    '''
-    Possible values of the Simulton state
-    '''
-    INIT = 'init'
-    RUNNING = 'running'
-    PAUSED = 'paused'
-    SHUTTING = 'shutting'
-
-    @classmethod
-    def is_valid(cls, st: Union[str, 'SimultonState']) -> bool:
-        '''
-        Valid value recognizer
-        '''
-        return st in SimultonState._value2member_map_
-
-    def __repr__(self):
-        '''
-        To enable serialization as a string...
-        '''
-        return repr(self.value)
 
 
 class Simulton(Process):

@@ -9,9 +9,9 @@ client = TestClient(app)
 root = '/api/v1/elevators'
 
 
-class TestElevatorSimulton(unittest.TestCase):
+class TestElevatorSimultonWithTestClient(unittest.TestCase):
     '''
-    Verify ElevatorSimulton functionality
+    Verify ElevatorSimulton functionality using TestClient
     '''
 
     def setUp(self):

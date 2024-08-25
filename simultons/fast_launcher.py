@@ -8,6 +8,9 @@ import subprocess
 import time
 from requests import get
 from requests.exceptions import RequestException
+from typing import Optional
+
+from . import rest_client
 
 
 class FastLauncher:
@@ -22,7 +25,7 @@ class FastLauncher:
         self._host = '127.0.0.1'
         self._path = path
         self._port = port
-        self._popen = None
+        self._popen: Optional[subprocess.Popen] = None
         self._health_uri = 'docs'
         return
 
@@ -46,6 +49,7 @@ class FastLauncher:
             'fastapi', 'run', '--host', self._host,
             '--port', str(self._port), '--workers', str(1), self._path
         ]
+        print('command_line:', command_line)
         self._popen = subprocess.Popen(
             command_line, cwd=parent_dir,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -59,6 +63,7 @@ class FastLauncher:
         start = time.time()
         time_to_timeout = start + timeout
         print(f'wait_until_reachable({url}, {timeout})', end='', flush=True)
+        assert self._popen is not None
         while time.time() < time_to_timeout:
             try:
                 self._popen.wait(0.2)
@@ -87,6 +92,7 @@ class FastLauncher:
         '''
         Stop the FastAPI service process
         '''
+        assert self._popen is not None
         if self._popen.returncode is None:
             try:
                 os.kill(self._popen.pid, signal.SIGINT)
@@ -97,8 +103,11 @@ class FastLauncher:
 
         stdout_value, stderr_value = self._popen.communicate()
         dashes = '==========================='
-        print(dashes, 'FastAPI stdout', dashes)
+        print(dashes, self._path, 'stdout', dashes)
         print(stdout_value)
-        print(dashes, 'FastAPI stderr', dashes)
+        print(dashes, self._path, 'stderr', dashes)
         print(stderr_value)
         return True
+
+    def get_rest_client(self, verbose: bool, dumpHeaders: bool):
+        return rest_client(self._host, self._port, verbose, dumpHeaders)

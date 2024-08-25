@@ -1,23 +1,120 @@
 '''
 Simulation launcher which in turn launches all the simultons
 '''
-from enum import Enum
-from typing import Union
+from enum import auto
+from typing import List, Union
 from fastapi import FastAPI
+from fastapi_utils.enums import StrEnum
 from pydantic import BaseModel, NonNegativeInt
 import zmq
 
+from . import FastLauncher
 
-class SimulationState(str, Enum):
+
+#
+# In this section we describe REST APIs inputs and outputs
+#
+
+
+class SimulationStateResponse(BaseModel):
+    '''
+    JSON describing simulation state
+    '''
+    state: str
+    rate: NonNegativeInt
+
+
+class SimulationStateRequest(BaseModel):
+    '''
+    JSON describing simulation state
+    '''
+    state: str
+
+
+class NewSimultonParams(BaseModel):
+    '''
+    JSON describing new simulton
+    '''
+    src_path: str
+
+
+class SimultonResponse(BaseModel):
+    '''
+    JSON describing simulton
+    '''
+    state: str
+    port: int
+
+#
+# Classes
+#
+
+
+class SimultonState(StrEnum):
+    '''
+    Possible values of the Simulton state
+    '''
+    INIT = auto()
+    RUNNING = auto()
+    PAUSED = auto()
+    SHUTTING = auto()
+
+    @classmethod
+    def is_valid(cls, st: Union[str, 'SimultonState']) -> bool:
+        '''
+        Valid value recognizer
+        '''
+        return st in SimultonState._value2member_map_
+
+    def __repr__(self):
+        '''
+        To enable serialization as a string...
+        '''
+        return repr(self.value)
+
+
+class Simulton:
+    '''
+    This is how simulation think of simulton
+    pass
+    '''
+    def __init__(self, source_path: str, port: int) -> None:
+        self._launcher = FastLauncher(source_path, port)
+        self._state = SimultonState.INIT
+        return
+
+    def to_response(self) -> SimultonResponse:
+        return SimultonResponse(
+            state=self._state, port=self._launcher.port)
+
+    @property
+    def port(self) -> int:
+        '_port accessor'
+        return self._launcher.port
+
+    def launch(self) -> int:
+        '''
+        Launch the simulton process
+        '''
+        return self._launcher.launch()
+
+    def shutdown(self):
+        '''
+        Shut the simulton process
+        '''
+        return self._launcher.shutdown()
+
+
+class SimulationState(StrEnum):
     '''
     Possible values of the simulation state
     '''
 
-    INIT = 'init'
-    INITIALIZING = 'initializing'
-    PAUSED = 'paused'
-    RUNNING = 'running'
-    SHUTTING = 'shutting'
+    INIT = auto()
+    INITIALIZING = auto()
+    PAUSED = auto()
+    RUNNING = auto()
+    SHUTTING = auto()
 
     @classmethod
     def is_valid(cls, st: Union[str, 'SimulationState']) -> bool:
@@ -41,7 +138,6 @@ class Simulation:
     #_zspec = "ipc:///var/run/sss"
     _zspec = "ipc:///tmp/sss"
 
-
     def __init__(self) -> None:
         '''
         Initializer
@@ -53,6 +149,8 @@ class Simulation:
         self._zcontext = zmq.Context()
         self._zsocket = self._zcontext.socket(zmq.PUB)
         self._zsocket.bind(self._zspec)
+
+        self._simultons: List[Simulton] = []
         return
 
     @property
@@ -66,7 +164,7 @@ class Simulation:
         self._state = state
         # share the sate update with the subscribers
         self._zsocket.send_string(SimulationStateResponse(
-            state=self._state, rate=self._rate).model_dump())
+            state=self._state, rate=self._rate).model_dump_json())
         return self._state
 
     @property
@@ -92,27 +190,13 @@ class Simulation:
         '''
         return f"<{type(self).__qualname__} is {self._state} at {self._rate} at {hex(id(self))}>"
 
+    def on_shutdown(self) -> None:
+        for s in self._simultons:
+            s.shutdown()
+        return
+
 
 theSimulation = Simulation()
-
-
-#
-# In this section we describe REST APIs inputs and outputs
-#
-class SimulationStateResponse(BaseModel):
-    '''
-    JSON describing simulation state
-    '''
-    state: str
-    rate: NonNegativeInt
-
-
-class SimulationStateRequest(BaseModel):
-    '''
-    JSON describing simulation state
-    '''
-    state: str
-
 #
 # Create a REST API service
 #
@@ -151,3 +235,19 @@ async def get_rate():
     '''
     return SimulationStateResponse(
         state=theSimulation.state, rate=theSimulation.rate).model_dump()
+
+
+@app.get('/simultons', response_model=List[SimultonResponse])
+async def get_simultons():
+    '''
+    Get the simulation rate
+    '''
+    return [s.to_response() for s in theSimulation._simultons]
+
+
+@app.post('/simultons', response_model=SimultonResponse, status_code=201)
+async def create_simulton(params: NewSimultonParams):
+    '''
+    Handle new simulton creation
+    '''
+    return None

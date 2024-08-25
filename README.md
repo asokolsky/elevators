@@ -29,7 +29,7 @@ brew install zmq
 
 For Linux:
 ```sh
-apt-get install libzmq3-dev
+sudo apt-get install libzmq3-dev
 ```
 
 To verify install:
