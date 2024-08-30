@@ -4,14 +4,16 @@ Playing with FastAPI, pydantic while simulating stuff
 
 from .button import Button, ButtonWithLed, ButtonWithLedPanel
 from .restc import rest_client, wait_until_reachable
-from .fast_launcher import FastLauncher
+from .schemas import NewClockParams, ClockResponse, \
+    NewElevatorParams, ElevatorResponse, Message, \
+    SimulationRequest, SimulationResponse, \
+    NewSimultonParams, SimultonResponse, ShutdownParams
 # order is important to avoid circular dependency!
+from .fast_launcher import FastLauncher
+from .simulton import Simulton
 from .elevator import Elevator
-from .elevator_simulton import app, NewElevatorParams, ElevatorResponse, \
-    Message
 from .clock import Clock
-from .simulation import Simulation, SimulationState, SimulationStateResponse, \
-    NewSimultonParams, SimultonResponse
+from .simulation import Simulation, SimulationState, theSimulation
 
 __version__ = "0.0.1"
 
@@ -26,20 +28,27 @@ __all__ = [
     'FastLauncher',
     # elevator_simulton.py
     'app',
-    'NewElevatorParams',
-    'ElevatorResponse',
-    'Message',
     # elevator.py
     'Elevator',
     # restc.py
     'rest_client',
     'wait_until_reachable',
-    # service.py
-    #'Service',
+    # simulton.py
+    'Simulton',
+    # schemas.py
+    'NewClockParams',
+    'ClockResponse',
+    'SimulationRequest',
+    'SimulationResponse',
+    'NewElevatorParams',
+    'NewSimultonParams',
+    'SimultonResponse',
+    'NewElevatorParams',
+    'ElevatorResponse',
+    'Message',
+    'ShutdownParams',
     # simulation.py
     'Simulation',
     'SimulationState',
-    'SimulationStateResponse',
-    'NewSimultonParams',
-    'SimultonResponse'
+    'theSimulation'
 ]

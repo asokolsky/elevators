@@ -4,7 +4,7 @@ Test launching/shutting FastAPI server programmatically
 import unittest
 import requests
 
-from simultons import rest_client, FastLauncher, NewElevatorParams, \
+from simultons import FastLauncher, NewElevatorParams, \
     ElevatorResponse
 
 
@@ -16,7 +16,7 @@ class TestSimulton(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         '''
-        Launch FastAPI process
+        For all the tests
         '''
         # print('setUpClass')
         cls._service = FastLauncher('simultons/elevator_simulton.py', 9000)

@@ -7,6 +7,7 @@ from typing import Any, Optional, Tuple
 from requests import Session, Response, get
 from requests.exceptions import JSONDecodeError
 
+
 class rest_client:
     '''
     HTTP client can use requests.request or requests.Session.
@@ -82,7 +83,11 @@ class rest_client:
         self.print_req('POST', url, data)
         resp = self.ses.post(url, json=data)
         self.print_resp('POST', resp)
-        return (resp.status_code, resp.json())
+        try:
+            jresp = resp.json()
+        except JSONDecodeError:
+            jresp = resp
+        return (resp.status_code, jresp)
 
     def delete(self, uri: str) -> Tuple[int, Any]:
         '''
@@ -94,7 +99,11 @@ class rest_client:
         self.print_req('DELETE', url, None)
         resp = self.ses.delete(url)
         self.print_resp('DELETE', resp)
-        return (resp.status_code, resp.json())
+        try:
+            jresp = resp.json()
+        except JSONDecodeError:
+            jresp = resp
+        return (resp.status_code, jresp)
 
     def put(self, uri: str, data: Any) -> Tuple[int, Any]:
         '''
@@ -106,7 +115,11 @@ class rest_client:
         self.print_req('PUT', url, data)
         resp = self.ses.put(url, json=data)
         self.print_resp('PUT', resp)
-        return (resp.status_code, resp.json())
+        try:
+            jresp = resp.json()
+        except JSONDecodeError:
+            jresp = resp
+        return (resp.status_code, jresp)
 
     def patch(self, uri: str, data: Any) -> Tuple[int, Any]:
         '''
@@ -118,7 +131,11 @@ class rest_client:
         self.print_req('PATCH', url, data)
         resp = self.ses.patch(url, json=data)
         self.print_resp('PATCH', resp)
-        return (resp.status_code, resp.json())
+        try:
+            jresp = resp.json()
+        except JSONDecodeError:
+            jresp = resp
+        return (resp.status_code, jresp)
 
 
 def wait_until_reachable(url: str, timeout: int) -> bool:

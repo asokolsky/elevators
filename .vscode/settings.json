@@ -4,7 +4,8 @@
         "pydantic",
         "restc",
         "Simulton",
-        "simultons"
+        "simultons",
+        "uvicorn"
     ],
     "makefile.configureOnOpen": false,
     "python.testing.unittestArgs": [

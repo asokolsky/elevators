@@ -16,3 +16,7 @@ There is a single [simulation](simulation.md) which provides context for
 ## Playing with it
 
 For now, the play is limited to running unit tests.
+
+## More readings
+
+https://github.com/encode/uvicorn/issues/761

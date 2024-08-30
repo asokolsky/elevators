@@ -79,7 +79,7 @@ class Button:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} '{self.annotated_label}' at {hex(id(self))}>"
+        return f"<{type(self).__qualname__} '{self.annotated_label}' at {hex((self))}>"
 
 
 class ButtonWithLed(Button):

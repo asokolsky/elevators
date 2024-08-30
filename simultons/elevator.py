@@ -1,11 +1,16 @@
-'''
+'''NewClockParams
 All the elevator-related stuff
 '''
 from enum import auto
-from typing import List, Union
+import os
+from typing import Dict, List, Union
+from fastapi import FastAPI, status
+from fastapi.responses import JSONResponse
 from fastapi_utils.enums import StrEnum
+from pydantic import NonNegativeInt
 
-from . import ButtonWithLedPanel  # [relative-beyond-top-level]
+from . import ButtonWithLedPanel, Simulton, ShutdownParams, \
+    ElevatorResponse, NewElevatorParams, Message
 
 
 class LoadValue(StrEnum):
@@ -41,11 +46,11 @@ class ElevatorState(StrEnum):
     # with or without load
     DOORS_OPENING = auto()
     # with or without load
-    DOORS_CLOSING =  auto()
+    DOORS_CLOSING = auto()
     # moving to a destination floor with or without load
-    GOING =  auto()
+    GOING = auto()
     # with or without load
-    DOORS_OPENED =  auto()
+    DOORS_OPENED = auto()
 
     @classmethod
     def is_valid(cls, st: Union[str, 'ElevatorState']) -> bool:
@@ -76,18 +81,21 @@ class Elevator:
     _min_load = 1
     _max_load = 700
 
-    def __init__(self, name: str, floors: int, current_floor: int = 0) -> None:
+    def __init__(self, sim: Simulton, name: str, floors: int,
+                 current_floor: int = 0) -> None:
         '''
         Initializer
         '''
+        self._sim = sim
+        self._id = sim.get_new_instance_id()
+        self._name = name
         #
         # Instance Attributes
         #
         self._current_floor = current_floor
         self._current_load = 0
         self._destination_floors: List[int] = []
-        self._name = name
-        self._state = ElevatorState.IDLE
+        self._estate = ElevatorState.IDLE
         #
         # Controls - create the control panel
         #
@@ -101,20 +109,13 @@ class Elevator:
         #
         return
 
-    @property
-    def name(self) -> str:
-        '''
-        just get the name
-        '''
-        return self._name
-
     def step_in(self, kilos: int) -> bool:
         '''
         passenger of weight kilos steps in
         '''
         if kilos <= 0:
             return False
-        if self._state != ElevatorState.DOORS_OPENED:
+        if self._estate != ElevatorState.DOORS_OPENED:
             return False
         self._current_load += kilos
         return True
@@ -125,7 +126,7 @@ class Elevator:
         '''
         if kilos <= 0:
             return False
-        if self._state != ElevatorState.DOORS_OPENED:
+        if self._estate != ElevatorState.DOORS_OPENED:
             return False
         self._current_load -= kilos
         if self._current_load < 0:
@@ -154,7 +155,7 @@ class Elevator:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} {self._name} is {self._state} " \
+        return f"<{type(self).__qualname__} {self._name} is {self._estate} " \
             f"on {self._current_floor} floor {self._panel.annotated_labels} " \
             f"at {hex(id(self))}>"
 
@@ -163,3 +164,92 @@ class Elevator:
         Request for the elevator to go to that floor.
         '''
         return
+
+
+class ElevatorSimulton(Simulton):
+    '''
+    Simulton for elevators
+    '''
+
+    def __init__(self) -> None:
+        '''
+        Initializer
+        '''
+        super().__init__()
+        return
+
+
+theElevatorSimulton = ElevatorSimulton()
+
+
+app = FastAPI(
+    title='elevator',
+    description='Elevator API',
+    version='0.0.1')
+
+
+@app.on_event('startup')
+async def startup_event():
+    print('elevators startup_event')
+    theElevatorSimulton.on_startup()
+    return
+
+
+@app.on_event('shutdown')
+async def shutdown_event():
+    print('elevators shutdown_event')
+    theElevatorSimulton.on_shutdown()
+    return
+
+
+@app.put(
+    '/api/v1/simulton/shutdown',
+    response_model=Message,
+    status_code=202,
+    responses={400: {"model": Message}})
+async def shutdown(params: ShutdownParams):
+    '''
+    Handle simulton shutdown
+    '''
+    theElevatorSimulton.shutdown()
+    pid = os.getpid()
+    return Message(f'Elevator simulton {pid} shutting down...').model_dump()
+
+
+@app.post(
+    '/api/v1/elevators/',
+    response_model=ElevatorResponse,
+    status_code=status.HTTP_201_CREATED)
+async def create_elevator(params: NewElevatorParams):
+    '''
+    Handle new instance creation
+    '''
+    el = Elevator(theElevatorSimulton, params.name, params.floors)
+    return ElevatorResponse(id=el._id, name=el._name).model_dump()
+
+
+@app.get('/api/v1/elevators', response_model=Dict[str, ElevatorResponse])
+async def get_elevators():
+    '''
+    Get all the elevators
+    '''
+    return {
+        id: ElevatorResponse(id=id, name=el._name).model_dump()
+        for id, el in theElevatorSimulton._instances.enumerate()
+    }
+
+
+@app.get('/api/v1/elevators/{id}', response_model=ElevatorResponse,
+         responses={404: {"model": Message}})
+async def get_elevator(id: NonNegativeInt):
+    '''
+    Get the specific elevator
+    '''
+    global elevators   # [global-variable-not-assigned]
+    try:
+        el = elevators[id]
+        return ElevatorResponse(id=id, name=el.name).model_dump()
+    except IndexError:
+        pass
+    content = Message("Item not found").model_dump()
+    return JSONResponse(status_code=404, content=content)

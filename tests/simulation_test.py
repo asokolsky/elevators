@@ -3,13 +3,10 @@ Testing the simulation/simulton stuff
 '''
 import unittest
 import requests
-from typing import Optional
+from typing import Optional, Dict
 
-from simultons import rest_client, FastLauncher, NewSimultonParams, \
-    SimulationStateResponse, SimultonResponse
-
-
-root = '/api/v1/simulation'
+from simultons import rest_client, wait_until_reachable, \
+    FastLauncher, SimulationResponse, NewSimultonParams, SimultonResponse
 
 
 class TestSimulation(unittest.TestCase):
@@ -28,84 +25,126 @@ class TestSimulation(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         '''
-        Launch FastAPI process
+        For all the test...
         '''
-        # print('setUpClass')
-        cls._service = FastLauncher('simultons/simulation.py', 9000)
-        #
-        # start the simulton process
-        #
-        assert cls._service.launch()
-        if not cls._service.wait_until_reachable(3):
-            cls._service.shutdown()
-            assert False
+        print('setUpClass')
         return
 
     @classmethod
     def tearDownClass(cls):
         '''
-        Shut FastAPI simulation process
+        After all the tests...
         '''
-        # print('tearDownClass')
-        #
-        # shut the simulton process
-        #
-        cls._service.shutdown()
+        print('tearDownClass')
         return
 
     def setUp(self):
+        '''
+        For every test
+        '''
+        self._service = FastLauncher('simultons/simulation.py', 9000)
+        #
+        # start the simulation process
+        #
+        assert self._service.launch()
+        if not self._service.wait_until_reachable(3):
+            self._service.shutdown()
+            assert False
         #
         #
-        # create client
+        # create simulation REST client
+        #
         verbose = True
         dumpHeaders = False
         self.restc = self._service.get_rest_client(verbose, dumpHeaders)
-
-        uri = f'{root}/state'
-        try:
-            (status_code, rdata) = self.restc.get(uri)
-            # print('status_code:', status_code)
-            # print('rdata:', rdata)
-            self.assertEqual(status_code, 200)
-        except requests.exceptions.ConnectionError as err:
-            print('Caught:', err)
-            self.assertFalse(err)
         return
 
     def tearDown(self):
         # print('tearDown')
         self.restc.close()
         self.restc = None
+        self._service.shutdown()
+        self._service = None
         return
 
-    def test_all(self) -> None:
+    def tt_minimal(self) -> None:
+        '''
+        Minimum test of the simulation API
+        '''
+        assert self.restc is not None
+        (status_code, rdata) = self.restc.get('/api/v1/simulation')
+        self.assertTrue(status_code, 200)
+        expected = {'state': 'PAUSED', 'rate': 0}
+        self.assertEqual(rdata, expected)
+        return
+
+    def create_clock_simultons(
+            self, num_simultons: int) -> Dict[int, SimultonResponse]:
+        res: Dict[int, SimultonResponse] = {}
+        assert self.restc is not None
+        for _ in range(num_simultons):
+            params = NewSimultonParams(src_path='simultons/clock.py')
+            (status_code, rdata) = self.restc.post(
+                '/api/v1/simulation/simultons', params.model_dump())
+            self.assertEqual(status_code, 201)
+            port = rdata['port']
+            state = rdata['state']
+            self.assertEqual(state, 'INIT')
+            res[port] = SimultonResponse(state=state, port=port)
+        return res
+
+    def test_one_simulton(self) -> None:
+        '''
+        Minimum test of the simulation API
+        '''
+        assert self.restc is not None
+        (status_code, rdata) = self.restc.get('/api/v1/simulation')
+        self.assertTrue(status_code, 200)
+        expected = {'state': 'PAUSED', 'rate': 0}
+        self.assertEqual(rdata, expected)
+        (status_code, rdata) = self.restc.get('/api/v1/simulation/simultons')
+        self.assertTrue(status_code, 200)
+        expected = {}
+        self.assertEqual(rdata, expected)
+
+        sims = self.create_clock_simultons(1)
+        print(sims)
+        self.assertEqual(len(sims), 1)
+        for port, sim in sims.items():
+            # reach out to the sim!
+            url = f'http://127.0.0.1:{port}/api/v1/clock'
+            self.assertTrue(wait_until_reachable(url, 5))
+            resp = requests.get(url)
+            self.assertAlmostEqual(resp.status_code, 200)
+            print('Clock:', resp)
+        return
+
+    def tt_all(self) -> None:
         '''
         Poke into the application service APIs
         '''
         assert self.restc is not None
-        (status_code, rdata) = self.restc.get(f'{root}/state')
+        (status_code, rdata) = self.restc.get('/api/v1/simulation')
         self.assertTrue(status_code, 200)
-        expected = {'state': 'INIT', 'rate': 0}
+        expected = {'state': 'PAUSED', 'rate': 0}
         self.assertEqual(rdata, expected)
 
-        (status_code, rdata) = self.restc.get(f'{root}/rate')
+        (status_code, rdata) = self.restc.get('/api/v1/simulation/simultons')
         self.assertTrue(status_code, 200)
-        expected = {'state': 'INIT', 'rate': 0}
+        expected = {}
         self.assertEqual(rdata, expected)
+        #
+        # create a few clock simultons
+        #
+        sims = self.create_clock_simultons(5)
+        #
+        #
+        #
+        (status_code, rdata) = self.restc.get('/api/v1/simulation/simultons')
+        self.assertTrue(status_code, 200)
+        self.assertEqual(len(rdata), len(sims))
+        self.assertIsInstance(rdata, dict)
 
-        (status_code, rdata) = self.restc.get(f'{root}/simultons')
-        self.assertTrue(status_code, 200)
-        expected = []
-        self.assertEqual(rdata, expected)
-        #
-        # create a clock simulton
-        #
-        params = NewSimultonParams(src_path='simultons/clock.py')
-        print('posting:', params.model_dump())
-        (status_code, rdata) = self.restc.post(
-            f'{root}/simultons', params.model_dump())
-        self.assertTrue(status_code, 201)
-        expected = SimultonResponse(state='INIT', port=9000)
-        self.assertEqual(rdata, expected.model_dump())
+        self.assertEqual(rdata, sims)
 
         return

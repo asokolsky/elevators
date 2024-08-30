@@ -1,42 +1,9 @@
 import time
 import unittest
-from simultons import Clock, FastLauncher, SimulationStateResponse
+from simultons import FastLauncher
 
 
-class TestClock(unittest.TestCase):
-    '''
-    Verify Simulation Clock functionality
-    '''
-
-    def setUp(self):
-        self._clock = Clock()
-        return
-
-    def tearDown(self):
-        # self._clock.shut()
-        self._clock = None
-        return
-
-    def test_all(self):
-        '''
-        Test the simulation clock functionality
-        '''
-
-        # clock was never started yet
-        self.assertEqual(self._clock.time, 0)
-        self.assertFalse(self._clock.on_pause())
-
-        # start it at normal rate
-        self.assertTrue(self._clock.on_run(1))
-        duration = 0.1
-        time.sleep(duration)
-        print(duration, self._clock.time)
-        self.assertGreaterEqual(self._clock.time, duration)
-
-        return
-
-
-class TestClockSimultonWithTestClient(unittest.TestCase):
+class TestClockSimulton(unittest.TestCase):
     '''
     Verify Simulation Clock Simulton functionality
     '''
@@ -44,13 +11,10 @@ class TestClockSimultonWithTestClient(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         '''
-        Launch simulation
+        Launch the simulton
         '''
         # print('setUpClass')
-        cls._service = FastLauncher('simultons/simulation.py', 9000)
-        #
-        # start the simulton process
-        #
+        cls._service = FastLauncher('simultons/clock.py', 9000)
         assert cls._service.launch()
         if not cls._service.wait_until_reachable(3):
             cls._service.shutdown()
@@ -65,7 +29,7 @@ class TestClockSimultonWithTestClient(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         '''
-        Shut FastAPI process
+        Shut the simulton process
         '''
         # print('tearDownClass')
         cls.restc.close()
@@ -85,15 +49,25 @@ class TestClockSimultonWithTestClient(unittest.TestCase):
         '''
         Test the simulation clock functionality
         '''
-        root = '/api/v1/simulation'
-
-        (status_code, rdata) = self.restc.get(f'{root}/state')
+        root = '/api/v1/clocks'
+        (status_code, rdata) = self.restc.get(root)
         self.assertTrue(status_code, 200)
-        expected = {'state': 'INIT', 'rate': 0}
+        expected = {}
         self.assertEqual(rdata, expected)
 
-        (status_code, rdata) = self.restc.get(f'{root}/simultons')
-        self.assertTrue(status_code, 200)
-        expected = []
-        self.assertEqual(rdata, expected)
+        # clock was never started yet
+        self.assertEqual(self._clock.time, 0)
+        self.assertFalse(self._clock.on_pause())
+
+        # start it at normal rate
+        self.assertTrue(self._clock.on_run(1))
+        duration = 0.1
+        time.sleep(duration)
+        print(duration, self._clock.time)
+        self.assertGreaterEqual(self._clock.time, duration)
+
+        #(status_code, rdata) = self.restc.get(f'{root}/simultons')
+        #self.assertTrue(status_code, 200)
+        #expected = []
+        #self.assertEqual(rdata, expected)
         return

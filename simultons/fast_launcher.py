@@ -10,7 +10,7 @@ from requests import get
 from requests.exceptions import RequestException
 from typing import Optional
 
-from . import rest_client
+from . import rest_client, ShutdownParams
 
 
 class FastLauncher:
@@ -88,26 +88,54 @@ class FastLauncher:
         print(f'\nwait_until_reachable({url}, {timeout}) => False')
         return False
 
-    def shutdown(self) -> bool:
+    def request_shutdown(self) -> bool:
+        '''
+        Issue simulton shutdown request
+        '''
+        verbose = True
+        dumpHeaders = True
+        restc = self.get_rest_client(verbose, dumpHeaders)
+        params = ShutdownParams(message='Ciao').model_dump()
+        (status_code, rdata) = restc.put('/api/v1/simulton/shutdown', params)
+        return (status_code == 202)
+
+    def shutdown(self, timeout:float = 0.5) -> bool:
         '''
         Stop the FastAPI service process
         '''
         assert self._popen is not None
-        if self._popen.returncode is None:
-            try:
-                os.kill(self._popen.pid, signal.SIGINT)
-            except ProcessLookupError:
-                print('Failed to locate process:', self._popen.pid)
-        else:
-            print('FastAPI is already down, ec:', self._popen.returncode)
+        if not self.request_shutdown():
+            if self._popen.returncode is None:
+                try:
+                    os.kill(self._popen.pid, signal.SIGINT)
+                except ProcessLookupError:
+                    print('Failed to locate process:', self._popen.pid)
+            else:
+                print('FastAPI is already down, ec:', self._popen.returncode)
+        #
+        # wait for the process to actually terminate
+        #
+        res = True
+        try:
+            self._popen.wait(timeout)
+            # the process has terminated
+            print(f'Process {self._popen.pid} shut, ec: {self._popen.returncode}')
+            res = True
 
+        except subprocess.TimeoutExpired:
+            print(f'Failed to shut {self._popen.pid}')
+            res = False
+        #
+        # get the child's stdout and stderr
+        #
         stdout_value, stderr_value = self._popen.communicate()
         dashes = '==========================='
-        print(dashes, self._path, 'stdout', dashes)
-        print(stdout_value)
-        print(dashes, self._path, 'stderr', dashes)
-        print(stderr_value)
-        return True
+        print(dashes, self._path, self._popen.pid, 'stdout', dashes, '\n',
+              stdout_value,
+              dashes, self._path, self._popen.pid, 'stderr', dashes, '\n',
+              stderr_value,
+              dashes, self._path, self._popen.pid, 'end', dashes)
+        return res
 
     def get_rest_client(self, verbose: bool, dumpHeaders: bool):
         return rest_client(self._host, self._port, verbose, dumpHeaders)
