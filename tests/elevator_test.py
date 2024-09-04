@@ -12,7 +12,7 @@ class TestElevator(unittest.TestCase):
     '''
 
     def setUp(self):
-        self.el = Elevator(5, 0)
+        self.el = Elevator(None, 'test', 5)
         return
 
     def tearDown(self):

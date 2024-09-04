@@ -79,7 +79,8 @@ class Button:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} '{self.annotated_label}' at {hex((self))}>"
+        return f"<{type(self).__qualname__} '{self.annotated_label}'" \
+            f" at {hex(id(self))}>"
 
 
 class ButtonWithLed(Button):
@@ -135,7 +136,8 @@ class ButtonWithLed(Button):
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} '{self.annotated_label}' at {hex(id(self))}>"
+        return f"<{type(self).__qualname__} '{self.annotated_label}'" \
+            f" at {hex(id(self))}>"
 
 
 class ButtonWithLedPanel:
@@ -146,7 +148,8 @@ class ButtonWithLedPanel:
     def __init__(self, labels: List[str], callback: Callable) -> None:
         self._buttons: List[ButtonWithLed] = []
         self._callback = callback
-        self._buttons = [ButtonWithLed(label, self.button_callback) for label in labels]
+        self._buttons = [ButtonWithLed(label, self.button_callback)
+                         for label in labels]
         return
 
     def button_callback(self, button: Button) -> None:
@@ -193,10 +196,11 @@ class ButtonWithLedPanel:
     def annotated_labels(self) -> List[str]:
         '''
         '''
-        return tuple(button.annotated_label for button in self._buttons)
+        return [button.annotated_label for button in self._buttons]
 
     def __repr__(self) -> str:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} {self.annotated_labels} at {hex(id(self))}>"
+        return f"<{type(self).__qualname__} {self.annotated_labels}" \
+            f" at {hex(id(self))}>"

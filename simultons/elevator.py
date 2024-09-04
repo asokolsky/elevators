@@ -2,15 +2,15 @@
 All the elevator-related stuff
 '''
 from enum import auto
-import os
-from typing import Dict, List, Union
-from fastapi import FastAPI, status
+from typing import Dict, List, Optional, Union
 from fastapi.responses import JSONResponse
 from fastapi_utils.enums import StrEnum
-from pydantic import NonNegativeInt
 
-from . import ButtonWithLedPanel, Simulton, ShutdownParams, \
+from . import ButtonWithLedPanel, \
+    Simulton, SimultonRequest, SimultonResponse, \
     ElevatorResponse, NewElevatorParams, Message
+
+from .simulton import get_random_id
 
 
 class LoadValue(StrEnum):
@@ -81,14 +81,22 @@ class Elevator:
     _min_load = 1
     _max_load = 700
 
-    def __init__(self, sim: Simulton, name: str, floors: int,
+    def __init__(self, sim: Optional[Simulton], name: str, floors: int,
                  current_floor: int = 0) -> None:
         '''
         Initializer
         '''
-        self._sim = sim
-        self._id = sim.get_new_instance_id()
+        assert floors > 0
+        self._floors = floors
+        self._id = ''
         self._name = name
+        self._sim = sim
+        if sim is None:
+            # important for testing
+            self._id = get_random_id()
+        else:
+            self._id = sim.get_new_instance_id()
+            sim.add_instance(self, self._id)
         #
         # Instance Attributes
         #
@@ -134,6 +142,13 @@ class Elevator:
         return True
 
     @property
+    def floors(self) -> int:
+        '''
+        returns the number of floors
+        '''
+        return self._floors
+
+    @property
     def load(self) -> LoadValue:
         '''
         returns the elevator's load value
@@ -165,11 +180,18 @@ class Elevator:
         '''
         return
 
+    def to_response(self) -> ElevatorResponse:
+        return ElevatorResponse(
+            id=self._id, name=self._name, floors=self._floors)
+
 
 class ElevatorSimulton(Simulton):
     '''
     Simulton for elevators
     '''
+    title = 'Elevator'
+    description = 'Elevator API'
+    version = '0.0.1'
 
     def __init__(self) -> None:
         '''
@@ -181,11 +203,7 @@ class ElevatorSimulton(Simulton):
 
 theElevatorSimulton = ElevatorSimulton()
 
-
-app = FastAPI(
-    title='elevator',
-    description='Elevator API',
-    version='0.0.1')
+app = theElevatorSimulton.create_app()
 
 
 @app.on_event('startup')
@@ -202,54 +220,61 @@ async def shutdown_event():
     return
 
 
+@app.get('/api/v1/simulton', response_model=SimultonResponse)
+async def get_simulton():
+    print('get elevator simulton')
+    return theElevatorSimulton.to_response()
+
+
 @app.put(
-    '/api/v1/simulton/shutdown',
-    response_model=Message,
+    '/api/v1/simulton',
+    response_model=SimultonResponse,
     status_code=202,
     responses={400: {"model": Message}})
-async def shutdown(params: ShutdownParams):
+async def put_simulton(req: SimultonRequest):
     '''
-    Handle simulton shutdown
+    Handle a request to change the simulton state
     '''
-    theElevatorSimulton.shutdown()
-    pid = os.getpid()
-    return Message(f'Elevator simulton {pid} shutting down...').model_dump()
+    if req.rate is not None:
+        theElevatorSimulton.rate = req.rate
+    theElevatorSimulton.state = req.state
+    return theElevatorSimulton.to_response()
+
+
+@app.get('/api/v1/elevators/', response_model=Dict[str, ElevatorResponse])
+async def get_instances():
+    '''
+    Get all the elevators
+    '''
+    return {
+        id: el.to_response().model_dump()
+        for id, el in theElevatorSimulton.instances.items()
+    }
 
 
 @app.post(
     '/api/v1/elevators/',
     response_model=ElevatorResponse,
-    status_code=status.HTTP_201_CREATED)
-async def create_elevator(params: NewElevatorParams):
+    status_code=201)
+async def create_instance(params: NewElevatorParams):
     '''
     Handle new instance creation
     '''
     el = Elevator(theElevatorSimulton, params.name, params.floors)
-    return ElevatorResponse(id=el._id, name=el._name).model_dump()
-
-
-@app.get('/api/v1/elevators', response_model=Dict[str, ElevatorResponse])
-async def get_elevators():
-    '''
-    Get all the elevators
-    '''
-    return {
-        id: ElevatorResponse(id=id, name=el._name).model_dump()
-        for id, el in theElevatorSimulton._instances.enumerate()
-    }
+    return el.to_response().model_dump()
 
 
 @app.get('/api/v1/elevators/{id}', response_model=ElevatorResponse,
          responses={404: {"model": Message}})
-async def get_elevator(id: NonNegativeInt):
+async def get_elevator(id: str):
     '''
     Get the specific elevator
     '''
     global elevators   # [global-variable-not-assigned]
     try:
-        el = elevators[id]
-        return ElevatorResponse(id=id, name=el.name).model_dump()
-    except IndexError:
+        el = theElevatorSimulton.get_instance_by_id(id)
+        return el.to_response().model_dump()
+    except KeyError:
         pass
     content = Message("Item not found").model_dump()
     return JSONResponse(status_code=404, content=content)

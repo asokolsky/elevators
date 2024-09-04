@@ -121,7 +121,7 @@ class TestButtonWithLedPanel(unittest.TestCase):
     '''
     Verify ButtonWithLedPanel functionality
     '''
-    labels = ('1', '2', '3', '4', '5')
+    labels = ['1', '2', '3', '4', '5']
 
     def setUp(self):
         self.panel = ButtonWithLedPanel(
@@ -150,25 +150,25 @@ class TestButtonWithLedPanel(unittest.TestCase):
         self.assertEqual(self.panel.leds_on, [2])
         self.assertEqual(
             self.panel.annotated_labels,
-            ('1', '2', '*_3_*', '4', '5'))
+            ['1', '2', '*_3_*', '4', '5'])
         self.panel.click(4)
         self.assertEqual(self.panel.leds_on, [2, 4])
         self.assertEqual(
             self.panel.annotated_labels,
-            ('1', '2', '*_3_*', '4', '*_5_*'))
+            ['1', '2', '*_3_*', '4', '*_5_*'])
 
         self.panel._buttons[0].disable()
         self.panel._buttons[4].disable()
         self.assertEqual(
             self.panel.annotated_labels,
-            ('_1_', '2', '*_3_*', '4', '*_5_*'))
+            ['_1_', '2', '*_3_*', '4', '*_5_*'])
         #
         # verify click on a disabled button has no effect
         #
         self.panel.click(4)
         self.assertEqual(
             self.panel.annotated_labels,
-            ('_1_', '2', '*_3_*', '4', '*_5_*'))
+            ['_1_', '2', '*_3_*', '4', '*_5_*'])
         #
         # verify panel reset
         #
@@ -176,7 +176,7 @@ class TestButtonWithLedPanel(unittest.TestCase):
         self.assertEqual(self.panel.leds_on, [])
         self.assertEqual(
             self.panel.annotated_labels,
-            ('1', '2', '3', '4', '5'))
+            ['1', '2', '3', '4', '5'])
         #
         # verify click on enabled button has effect
         #
@@ -184,11 +184,11 @@ class TestButtonWithLedPanel(unittest.TestCase):
         self.assertEqual(self.panel.leds_on, [4])
         self.assertEqual(
             self.panel.annotated_labels,
-            ('1', '2', '3', '4', '*_5_*'))
+            ['1', '2', '3', '4', '*_5_*'])
 
         self.panel.click(2)
         self.assertEqual(self.panel.leds_on, [2, 4])
-        annotated_labels = ('1', '2', '*_3_*', '4', '*_5_*')
+        annotated_labels = ['1', '2', '*_3_*', '4', '*_5_*']
         self.assertEqual(self.panel.annotated_labels, annotated_labels)
         self.assertEqual(
             self.panel.__repr__(),

@@ -1,12 +1,12 @@
 import unittest
 from fastapi.testclient import TestClient
 
-from simultons import app, NewElevatorParams, ElevatorResponse
-
+from simultons import NewElevatorParams, ElevatorResponse
+from simultons.elevator import app
 
 client = TestClient(app)
 
-root = '/api/v1/elevators'
+elevators_uri = '/api/v1/elevators/'
 
 
 class TestElevatorSimultonWithTestClient(unittest.TestCase):
@@ -27,47 +27,37 @@ class TestElevatorSimultonWithTestClient(unittest.TestCase):
         #
         # blank slate, no elevators created yet
         #
-        response = client.get('/')
+        response = client.get(elevators_uri)
         self.assertTrue(response.status_code, 200)
-        self.assertEqual(response.json(), [])
-
-        response = client.get(f'{root}/')
-        self.assertTrue(response.status_code, 200)
-        self.assertEqual(response.json(), [])
+        self.assertEqual(response.json(), {})
 
         #
         # Create some elevators
         #
         floors = 10
         names = ['foo', 'bar', 'baz']
-        for id, name in enumerate(names):
+        for name in names:
             params = NewElevatorParams(name=name, floors=floors)
             print('posting:', params.model_dump())
-            response = client.post(f'{root}/', json=params.model_dump())
+            response = client.post(elevators_uri, json=params.model_dump())
             self.assertTrue(response.status_code, 201)
-            expected = ElevatorResponse(id=id, name=name)
-            print('received:', response.json())
-            print('expected:', expected.model_dump())
-            self.assertEqual(
-                response.json(), expected.model_dump(), 'response as expected')
-        #
-        # retrieve them, one at a time
-        #
-        for id, name in enumerate(names):
-            response = client.get(f'{root}/{id}')
-            expected = ElevatorResponse(id=id, name=name)
-            print('received:', response.json())
-            print('expected:', expected.model_dump())
-            self.assertEqual(
-                response.json(), expected.model_dump(), 'response as expected')
+            jresp = response.json()
+            self.assertEqual(jresp['name'], name)
         #
         # retrieve them all
         #
-        response = client.get(f'{root}/')
-        expected = []
-        for id, name in enumerate(names):
-            expected.append(ElevatorResponse(id=id, name=name).model_dump())
-        print('received:', response.json())
-        print('expected:', expected)
-        self.assertEqual(response.json(), expected, 'response as expected')
+        response = client.get(elevators_uri)
+        self.assertTrue(response.status_code, 200)
+        jresp = response.json()
+        #
+        # retrieve them, one at a time
+        #
+        for id, el in jresp.items():
+            response = client.get(f'{elevators_uri}{id}')
+            expected = ElevatorResponse(
+                id=id, name=el['name'], floors=floors)
+            print('received:', response.json())
+            print('expected:', expected.model_dump())
+            self.assertEqual(response.json(), expected.model_dump())
+
         return

@@ -4,8 +4,10 @@ Test launching/shutting FastAPI server programmatically
 import unittest
 import requests
 
-from simultons import FastLauncher, NewElevatorParams, \
-    ElevatorResponse
+from simultons import SimultonProxy, NewElevatorParams
+
+simulton_uri = '/api/v1/simulton'
+elevators_uri = '/api/v1/elevators/'
 
 
 class TestSimulton(unittest.TestCase):
@@ -18,8 +20,8 @@ class TestSimulton(unittest.TestCase):
         '''
         For all the tests
         '''
-        # print('setUpClass')
-        cls._service = FastLauncher('simultons/elevator_simulton.py', 9000)
+        print('TestSimulton.setUpClass')
+        cls._service = SimultonProxy('simultons/elevator.py', 9000)
         #
         # start the simulton process
         #
@@ -27,12 +29,8 @@ class TestSimulton(unittest.TestCase):
         if not cls._service.wait_until_reachable(3):
             cls._service.shutdown()
             assert False
-        #
-        # create client
-        #
-        verbose = True
-        dumpHeaders = False
-        cls.restc = cls._service.get_rest_client(verbose, dumpHeaders)
+        # save the client
+        cls.restc = cls._service._launcher._restc
         return
 
     @classmethod
@@ -40,8 +38,7 @@ class TestSimulton(unittest.TestCase):
         '''
         Shut FastAPI process
         '''
-        # print('tearDownClass')
-        cls.restc.close()
+        print('TestSimulton.tearDownClass')
         #
         # shut the simulton process
         #
@@ -53,11 +50,8 @@ class TestSimulton(unittest.TestCase):
         #
         # verify the FastAPI server is running
         #
-        uri = '/'
         try:
-            (status_code, rdata) = self.restc.get(uri)
-            # print('status_code:', status_code)
-            # print('rdata:', rdata)
+            (status_code, rdata) = self.restc.get(simulton_uri)
             self.assertEqual(status_code, 200)
         except requests.exceptions.ConnectionError as err:
             print('Caught:', err)
@@ -75,42 +69,36 @@ class TestSimulton(unittest.TestCase):
         '''
         # print('test_all', 'fastapi pid:', self.popen.pid)
 
-        root = '/api/v1/simulation'
-        (status_code, rdata) = self.restc.get(f'{root}/state')
+        (status_code, rdata) = self.restc.get(simulton_uri)
         self.assertTrue(status_code, 200)
-        self.assertTrue(status_code, 200)
-        expected = {'state': 'INIT', 'rate': 0}
-        self.assertEqual(rdata, expected)
+        self.assertEqual(rdata['state'], 'PAUSED')
+        self.assertEqual(rdata['rate'], 0)
         #
         # Create some elevators
         #
         floors = 10
         names = ['foo', 'bar', 'baz']
-        for id, name in enumerate(names):
+        for name in names:
             params = NewElevatorParams(name=name, floors=floors)
             (status_code, rdata) = self.restc.post(
-                f'{root}/', params.model_dump())
+                elevators_uri, params.model_dump())
             self.assertTrue(status_code, 201)
-            expected = ElevatorResponse(id=id, name=name)
-            self.assertEqual(
-                rdata, expected.model_dump(), 'response as expected')
-        #
-        # retrieve them, one at a time
-        #
-        for id, name in enumerate(names):
-            (status_code, rdata) = self.restc.get(f'{root}/{id}')
-            expected = ElevatorResponse(id=id, name=name)
-            self.assertEqual(
-                rdata, expected.model_dump(), 'response as expected')
+            self.assertTrue(rdata['name'], name)
+            self.assertTrue(rdata['floors'], floors)
         #
         # retrieve them all
         #
-        (status_code, rdata) = self.restc.get(f'{root}/')
-        expected = []
-        for id, name in enumerate(names):
-            expected.append(ElevatorResponse(id=id, name=name).model_dump())
-        print('received:', rdata)
-        print('expected:', expected)
-        self.assertEqual(rdata, expected, 'response as expected')
+        (status_code, elevators) = self.restc.get(elevators_uri)
+        self.assertTrue(status_code, 200)
+        self.assertEqual(len(elevators), len(names))
+
+        for id, el in elevators.items():
+            #
+            # retrieve them, one at a time
+            #
+            (status_code, rdata) = self.restc.get(f'{elevators_uri}{id}')
+            self.assertTrue(status_code, 200)
+            self.assertEqual(rdata, el)
+            self.assertIn(el['name'], names)
 
         return

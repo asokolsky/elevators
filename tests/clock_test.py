@@ -1,6 +1,10 @@
 import time
+from typing import Dict
 import unittest
-from simultons import FastLauncher
+from simultons import SimultonProxy, NewClockParams, ClockResponse
+
+simulton_uri = '/api/v1/simulton'
+clocks_uri = '/api/v1/clocks/'
 
 
 class TestClockSimulton(unittest.TestCase):
@@ -11,19 +15,16 @@ class TestClockSimulton(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         '''
-        Launch the simulton
+        Launch the simulton - usually this is done by the simulation process.
         '''
-        # print('setUpClass')
-        cls._service = FastLauncher('simultons/clock.py', 9000)
+        print('TestClockSimulton.setUpClass')
+        cls._service = SimultonProxy('simultons/clock.py', 9000)
         assert cls._service.launch()
         if not cls._service.wait_until_reachable(3):
             cls._service.shutdown()
             assert False
-        #
-        # create client
-        verbose = True
-        dumpHeaders = False
-        cls.restc = cls._service.get_rest_client(verbose, dumpHeaders)
+        # save the client
+        cls.restc = cls._service._launcher._restc
         return
 
     @classmethod
@@ -31,8 +32,7 @@ class TestClockSimulton(unittest.TestCase):
         '''
         Shut the simulton process
         '''
-        # print('tearDownClass')
-        cls.restc.close()
+        print('TestClockSimulton.tearDownClass')
         #
         # shut the simulton process
         #
@@ -45,29 +45,119 @@ class TestClockSimulton(unittest.TestCase):
     def tearDown(self):
         return
 
-    def test_all(self):
+    def create_clocks(self, num_clocks: int) -> Dict[str, ClockResponse]:
+        '''
+        Returns Dict[clockID, ClockResponse]
+        '''
+        res: Dict[str, ClockResponse] = {}
+        assert self.restc is not None
+        for num in range(num_clocks):
+            name = f'clock-{num}'
+            params = NewClockParams(name=name)
+            (status_code, rdata) = self.restc.post(
+                clocks_uri, params.model_dump())
+            self.assertEqual(status_code, 201)
+            id = rdata['id']
+            self.assertTrue(id)
+            self.assertEqual(rdata['name'], name)
+            time = rdata['time']
+            self.assertTrue(str(time))
+            res[id] = rdata
+        return res
+
+    def get_time(self, clock_id) -> ClockResponse:
+        (status_code, rdata) = self.restc.get(
+            f'{clocks_uri}{clock_id}')
+        self.assertEqual(status_code, 200)
+        return rdata
+
+    def get_nonexistent_clock(self) -> None:
+        (status_code, rdata) = self.restc.get(
+            f'{clocks_uri}1234567890')
+        self.assertEqual(status_code, 404)
+        expected = {'message': 'Item not found'}
+        self.assertEqual(expected, rdata)
+        return
+
+    def del_nonexistent_clock(self) -> None:
+        (status_code, rdata) = self.restc.delete(
+            f'{clocks_uri}1234567890')
+        self.assertEqual(status_code, 404)
+        expected = {'message': 'Item not found'}
+        self.assertEqual(expected, rdata)
+        return
+
+    def test_one(self):
         '''
         Test the simulation clock functionality
         '''
-        root = '/api/v1/clocks'
-        (status_code, rdata) = self.restc.get(root)
+        (status_code, rdata) = self.restc.get(clocks_uri)
         self.assertTrue(status_code, 200)
         expected = {}
         self.assertEqual(rdata, expected)
 
+        self.get_nonexistent_clock()
+        self.del_nonexistent_clock()
+
+        clocks = self.create_clocks(1)
+        print(clocks)
+        theClockId = ''
+        for id, clock in clocks.items():
+            theClockId = id
+            break
+        # retrieve the theClockId clock
+        rdata = self.get_time(theClockId)
+        self.assertEqual(rdata, clocks[theClockId])
         # clock was never started yet
-        self.assertEqual(self._clock.time, 0)
-        self.assertFalse(self._clock.on_pause())
+        self.assertEqual(rdata['time'], 0.0)
+
+        # pause it
+        self.assertTrue(self._service.pause())
 
         # start it at normal rate
-        self.assertTrue(self._clock.on_run(1))
-        duration = 0.1
-        time.sleep(duration)
-        print(duration, self._clock.time)
-        self.assertGreaterEqual(self._clock.time, duration)
+        self.assertTrue(self._service.run())
 
-        #(status_code, rdata) = self.restc.get(f'{root}/simultons')
-        #self.assertTrue(status_code, 200)
-        #expected = []
-        #self.assertEqual(rdata, expected)
+        # sleep for a pre-defined period
+        duration = 0.3
+        time.sleep(duration)
+
+        # retrieve the theClockId clock
+        rdata = self.get_time(theClockId)
+        self.assertTrue(rdata['time'] > 0.0)
+        self.assertTrue(rdata['time'] > duration)
+        print('I slept for', duration, 'clock', rdata['time'])
+
+        times = 10
+        for _ in range(10):
+            # pause it
+            self.assertTrue(self._service.pause())
+            # start it at normal rate
+            self.assertTrue(self._service.run())
+            # sleep for a pre-defined period
+            time.sleep(duration)
+
+        # retrieve the theClockId clock
+        rdata = self.get_time(theClockId)
+        self.assertTrue(rdata['time'] > 0.0)
+        self.assertTrue(rdata['time'] > duration)
+        print('I slept for', duration * (times+1), 'clock', rdata['time'])
+
+        self.get_nonexistent_clock()
+        self.del_nonexistent_clock()
+
+        # now delete clock theClockId
+        (status_code, rdata) = self.restc.delete(
+            f'{clocks_uri}{theClockId}')
+        self.assertEqual(status_code, 200)
+
+        self.get_nonexistent_clock()
+        self.del_nonexistent_clock()
+        return
+
+    def test_many(self):
+        '''
+        Test the simulation clocks functionality:
+        - create N clocks,
+        - use a pull of P processes to retrieve current clock time T times
+        '''
         return

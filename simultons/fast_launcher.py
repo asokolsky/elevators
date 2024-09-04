@@ -1,16 +1,14 @@
 '''
 FastAPI process launcher
 '''
-
 import os
 import signal
 import subprocess
 import time
+from typing import Any, Dict, Optional
 from requests import get
 from requests.exceptions import RequestException
-from typing import Optional
-
-from . import rest_client, ShutdownParams
+from . import rest_client
 
 
 class FastLauncher:
@@ -26,7 +24,12 @@ class FastLauncher:
         self._path = path
         self._port = port
         self._popen: Optional[subprocess.Popen] = None
-        self._health_uri = 'docs'
+        #
+        # control REST client verbosity
+        #
+        verbose = True
+        dumpHeaders = False
+        self._restc = self.get_rest_client(verbose, dumpHeaders)
         return
 
     @property
@@ -55,11 +58,13 @@ class FastLauncher:
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         return self._popen.pid
 
-    def wait_until_reachable(self, timeout: int) -> bool:
+    def wait_until_reachable(
+            self, health_uri: str, timeout: int) -> Optional[Dict[str, Any]]:
         '''
-        give some room for the process to start
+        give some room for the process to start.
+        Returns a JSON produced by health_uri
         '''
-        url = f'http://{self._host}:{self._port}/{self._health_uri}'
+        url = f'http://{self._host}:{self._port}{health_uri}'
         start = time.time()
         time_to_timeout = start + timeout
         print(f'wait_until_reachable({url}, {timeout})', end='', flush=True)
@@ -68,8 +73,10 @@ class FastLauncher:
             try:
                 self._popen.wait(0.2)
                 # if we are here, this means the process has terminated
-                print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs, process terminated')
-                return False
+                print(f'\nwait_until_reachable({url}, {timeout}) => None,'
+                      f' after {time.time()-start:.2f} secs,'
+                      ' process terminated')
+                return None
 
             except subprocess.TimeoutExpired:
                 print('.', end='', flush=True)
@@ -79,52 +86,54 @@ class FastLauncher:
                 x = get(url, timeout=0.01)
                 if x.ok:
                     # YES!
-                    print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
-                    return True
+                    jres = x.json()
+                    print(f'\nwait_until_reachable({url}, {timeout}) => {jres},'
+                          f' after {time.time()-start:.2f} secs')
+                    return jres
 
             except RequestException:
                 pass
 
-        print(f'\nwait_until_reachable({url}, {timeout}) => False')
+        print(f'\nwait_until_reachable({url}, {timeout}) => None')
+        return None
+
+    def wait_to_die(self, timeout: float = 0.5) -> bool:
+        assert self._popen is not None
+        if self._popen.returncode is not None:
+            print(f'Process {self._popen.pid} already terminated with ec:',
+                  self._popen.returncode)
+            return True
+        #
+        # wait for the process to actually terminate
+        #
+        print(f'Waiting for upto {timeout} secs for {self._popen.pid} to die...')
+        try:
+            self._popen.wait(timeout)
+            # the process has terminated
+            print(self._popen.pid, 'died, ec:', self._popen.returncode)
+            return True
+
+        except subprocess.TimeoutExpired:
+            print(f'Waiting for {self._popen.pid} to die timed out after',
+                  timeout, 'secs')
         return False
 
-    def request_shutdown(self) -> bool:
-        '''
-        Issue simulton shutdown request
-        '''
-        verbose = True
-        dumpHeaders = True
-        restc = self.get_rest_client(verbose, dumpHeaders)
-        params = ShutdownParams(message='Ciao').model_dump()
-        (status_code, rdata) = restc.put('/api/v1/simulton/shutdown', params)
-        return (status_code == 202)
-
-    def shutdown(self, timeout:float = 0.5) -> bool:
+    def shutdown(self, timeout: float = 0.5) -> bool:
         '''
         Stop the FastAPI service process
         '''
         assert self._popen is not None
-        if not self.request_shutdown():
-            if self._popen.returncode is None:
-                try:
-                    os.kill(self._popen.pid, signal.SIGINT)
-                except ProcessLookupError:
-                    print('Failed to locate process:', self._popen.pid)
-            else:
-                print('FastAPI is already down, ec:', self._popen.returncode)
+        if self._popen.returncode is None:
+            try:
+                os.kill(self._popen.pid, signal.SIGINT)
+            except ProcessLookupError:
+                print('Failed to locate process:', self._popen.pid)
+        else:
+            print('FastAPI is already down, ec:', self._popen.returncode)
         #
         # wait for the process to actually terminate
         #
-        res = True
-        try:
-            self._popen.wait(timeout)
-            # the process has terminated
-            print(f'Process {self._popen.pid} shut, ec: {self._popen.returncode}')
-            res = True
-
-        except subprocess.TimeoutExpired:
-            print(f'Failed to shut {self._popen.pid}')
-            res = False
+        res = self.wait_to_die(timeout)
         #
         # get the child's stdout and stderr
         #

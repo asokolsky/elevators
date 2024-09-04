@@ -17,6 +17,13 @@ Simulation informs simultons about:
 * simulation state, e.g. whether it is paused or is running;
 * simulation rate, e.g. 1:1 or 100:1
 
-## Simulation as a REST service
+## REST service /api/v1/simulation
 
-Simulation is also a REST service.
+* GET -> SimulationResponse
+* PUT, SimulationRequest -> SimulationResponse
+
+## REST service /api/v1/simultons
+
+* GET -> Dict[int port, SimultonResponse])
+* PORT NewSimultonParams -> SimultonResponse
+* GET '/api/v1/simultons/{id}' -> SimultonResponse

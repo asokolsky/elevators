@@ -1,7 +1,9 @@
 '''
 Schemas for the REST APIs inputs and outputs
 '''
-from pydantic import BaseModel, PositiveInt, NonNegativeInt
+from enum import auto
+from fastapi_utils.enums import StrEnum
+from pydantic import BaseModel, PositiveInt
 
 
 class NewClockParams(BaseModel):
@@ -34,6 +36,7 @@ class ElevatorResponse(BaseModel):
     '''
     id: str
     name: str
+    floors: PositiveInt
 
 
 class Message(BaseModel):
@@ -47,6 +50,65 @@ class Message(BaseModel):
         return
 
 
+class SimulationState(StrEnum):
+    '''
+    Possible values of the simulation state
+    '''
+    INIT = auto()
+    INITIALIZING = auto()
+    PAUSED = auto()
+    RUNNING = auto()
+    SHUTTING = auto()
+
+    def __repr__(self):
+        '''
+        To enable serialization as a string...
+        '''
+        return repr(self.value)
+
+
+class SimulationRequest(BaseModel):
+    '''
+    JSON describing simulation state.
+    rate 0 - pause
+    1 - normal rate
+    2 - x2 rate, etc
+    Returned is SimulationResponse
+    '''
+    state: SimulationState
+    rate: float | None = None
+
+
+class SimulationResponse(BaseModel):
+    '''
+    JSON describing simulation state
+    '''
+    state: SimulationState
+    rate: float
+
+
+class SimultonState(StrEnum):
+    '''
+    Possible values of the Simulton state,
+    which is somewhat related to the simulation state
+    '''
+    INIT = auto()
+    RUNNING = auto()
+    PAUSED = auto()
+    SHUTTING = auto()
+
+    def __repr__(self):
+        '''
+        To enable serialization as a string...
+        '''
+        # default implementation
+        # type_ = type(self)
+        # module = type_.__module__
+        # qualname = type_.__qualname__
+        # return f"<{module}.{qualname} object at {hex(id(self))}>"
+        return repr(self.value)
+
+
 class NewSimultonParams(BaseModel):
     '''
     JSON describing new simulton
@@ -54,32 +116,25 @@ class NewSimultonParams(BaseModel):
     src_path: str
 
 
-class SimulationResponse(BaseModel):
+class SimultonRequest(BaseModel):
     '''
-    JSON describing simulation state
+    JSON describing simulation state.
+    rate 0 - pause
+    1 - normal rate
+    2 - x2 rate, etc
+    Returned is SimulationResponse
     '''
-    state: str
-    rate: NonNegativeInt
-
-
-class SimulationRequest(BaseModel):
-    '''
-    JSON describing simulation state
-    '''
-    state: str
-    rate: NonNegativeInt
+    state: SimultonState
+    rate: float | None = None
 
 
 class SimultonResponse(BaseModel):
     '''
     JSON describing simulton
     '''
-    state: str
-    port: int
-
-
-class ShutdownParams(BaseModel):
-    '''
-    JSON describing Simulton Shutdown arguments
-    '''
-    message: str
+    description: str
+    port: PositiveInt | None = None
+    rate: float
+    state: SimultonState
+    title: str
+    version: str

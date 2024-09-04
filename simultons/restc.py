@@ -50,7 +50,7 @@ class rest_client:
                 jresp = resp.json()
             except JSONDecodeError:
                 jresp = resp
-            print('HTTP', method, '=>', resp.status_code, ',', str(jresp))
+            print('HTTP', method, '=>', resp.status_code, str(jresp))
         if self.dumpHeaders:
             print('HTTP Response Headers:')
             for h in resp.headers:
@@ -138,7 +138,7 @@ class rest_client:
         return (resp.status_code, jresp)
 
 
-def wait_until_reachable(url: str, timeout: int) -> bool:
+def wait_until_reachable(url: str, timeout: int) -> Optional[Response]:
     '''
     Wait upto timeout secs until the url is reachable
     '''
@@ -152,10 +152,11 @@ def wait_until_reachable(url: str, timeout: int) -> bool:
             x = get(url)
             if x.ok:
                 # YES!
-                print(f'\nwait_until_reachable({url}, {timeout}) => True, after {time.time()-start:.2f} secs')
-                return True
+                print(f'\nwait_until_reachable({url}, {timeout}) => {x},'
+                      f' after {time.time()-start:.2f} secs')
+                return x
         except Exception:
             print('.', end='', flush=True)
             pass
-    print(f'\nwait_until_reachable({url}, {timeout}) => False')
-    return False
+    print(f'\nwait_until_reachable({url}, {timeout}) => None')
+    return None

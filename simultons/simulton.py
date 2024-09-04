@@ -6,50 +6,39 @@ A simulton is:
 
 This simulton is not related to https://ogden.eu/simultons/
 '''
-from enum import auto
 import os
 import random
 import signal
 import string
-from typing import Any, Dict, Union
-from fastapi_utils.enums import StrEnum
+from typing import Any, Dict
+from fastapi import FastAPI
+from . import SimultonResponse, SimultonState
 
 
-class SimultonState(StrEnum):
-    '''
-    Possible values of the Simulton state,
-    which is somewhat related to the simulation state
-    '''
-    INIT = auto()
-    RUNNING = auto()
-    PAUSED = auto()
-    SHUTTING = auto()
-
-    @classmethod
-    def is_valid(cls, st: Union[str, 'SimultonState']) -> bool:
-        '''
-        Valid value recognizer
-        '''
-        return st in SimultonState._value2member_map_
-
-    def __repr__(self):
-        '''
-        To enable serialization as a string...
-        '''
-        return repr(self.value)
+def get_random_id() -> str:
+    length = 8
+    return ''.join(
+        random.choice(string.ascii_lowercase) for _ in range(length))
 
 
 class Simulton:
     '''
-    A unit of simulation with REST API exposed via FastAPI(s)
+    A unit of simulation with REST API exposed via FastAPI(s).
+    This class is ued as a parent to an actual class to be instantiated in the
+    simulton process.
     '''
+    title = 'FooBar'
+    description = 'FooBar API'
+    version = '0.0.1'
+
     def __init__(self, name: str = '') -> None:
         self._state = SimultonState.INIT
         self._rate: float = 0
         if not name:
             name = f'{type(self).__qualname__}@{hex(id(self))}'
         self._name = name
-        self._instances: Dict[int, Any] = {}
+        # map of instance ID to the instance itself
+        self._instances: Dict[str, Any] = {}
         return
 
     @property
@@ -60,9 +49,26 @@ class Simulton:
     @state.setter
     def state(self, state: SimultonState) -> SimultonState:
         '''Simulton state setter'''
-        print(f'Simulton state {self._state} -> {state}')
+        if state == self._state:
+            return state
+        print(f'Simulton {self.title} {self._state} -> {state}')
+        # old_state = self._state
         self._state = state
-        return self._state
+        if state == SimultonState.RUNNING:
+            self.on_running()
+        elif state == SimultonState.PAUSED:
+            self.on_paused()
+        elif state == SimultonState.SHUTTING:
+            self.on_shutting()
+        else:
+            assert False
+        return state
+
+    def is_running(self) -> bool:
+        return self._state == SimultonState.RUNNING
+
+    def is_paused(self) -> bool:
+        return self._state == SimultonState.PAUSED
 
     @property
     def name(self) -> str:
@@ -77,6 +83,40 @@ class Simulton:
         just get the rate
         '''
         return self._rate
+
+    @rate.setter
+    def rate(self, rate: float) -> float:
+        '''Simulton rate setter'''
+        if rate == self._rate:
+            return rate
+        print(f'Simulton rate {self._rate} -> {rate}')
+        self._rate = rate
+        return rate
+
+    @property
+    def instances(self) -> Dict[str, Any]:
+        return self._instances
+
+    def on_running(self) -> None:
+        '''
+        State just transitioned to RUNNING
+        '''
+        print('Simulton.on_running')
+        return
+
+    def on_paused(self) -> None:
+        '''
+        State just transitioned to PAUSED
+        '''
+        print('Simulton.on_paused')
+        return
+
+    def on_shutting(self) -> None:
+        '''
+        State just transitioned to SHUTTING
+        '''
+        print('Simulton.on_shutting')
+        return
 
     def on_startup(self) -> None:
         '''
@@ -103,46 +143,71 @@ class Simulton:
         return
 
     def get_new_instance_id(self) -> str:
-        length = 8
-        id = ''.join(random.choice(string.ascii_lowercase)
-                     for _ in range(length))
-        return f'{type(self).__qualname__}#{id}'
+        return f'{self.title}-{get_random_id()}'
 
-    def add_instance(self, inst: Any, id: str = '') -> None:
-        if not id:
-            id = self.get_new_instance_id()
+    def add_instance(self, inst: Any, id: str) -> None:
+        assert id
         self._instances[id] = inst
         return
 
+    def get_instance_by_id(self, id: str) -> Any:
+        '''Raises KeyError if id is not a key'''
+        return self._instances[id]
+
+    def del_instance_by_id(self, id: str) -> None:
+        '''Raises KeyError if id is not a key'''
+        del self._instances[id]
+        return
+
+    def create_app(self) -> FastAPI:
+        return FastAPI(
+            title=self.title, description=self.description,
+            version=self.version)
+
+    def to_response(self) -> SimultonResponse:
+        return SimultonResponse(
+            description=self.description,
+            rate=self.rate,
+            state=self.state,
+            title=self.title,
+            version=self.version)
 
 #
 # the derivatives have to have these:
 #
-# app = FastAPI(
-#     title='clock',
-#     description='FooBar API',
-#     version='0.0.1')
+# theDerivedSimulton = ClockSimulton()
+#
+# app = theDerivedSimulton.create_app()
 
 # @app.on_event('startup')
 # async def startup_event():
 #     print('simulation startup_event')
-#     theClockSimulton.on_startup()
+#     theDerivedSimulton.on_startup()
 #     return
 
 # @app.on_event('shutdown')
 # async def shutdown_event():
 #     print('simulation shutdown_event')
-#     theClockSimulton.on_shutdown()
+#     theDerivedSimulton.on_shutdown()
 #     return
 
+# @app.get('/api/v1/simulton', response_model=SimultonResponse)
+# async def get_simulton():
+#    '''
+#    Get the simulton - state and all
+#    '''
+#    return theDerivedSimulton.to_response()
+
 # @app.put(
-#    '/api/v1/simulton/shutdown',
-#    response_model=Message,
+#    '/api/v1/simulton',
+#    response_model=SimultonResponse,
 #    status_code=202,
 #    responses={400: {"model": Message}})
-# async def shutdown(params: ShutdownParams):
+# async def put_simulton(params: SimultonRequest):
 #    '''
-#    Handle new simulton shutdown request
-#   '''
-#    theClockSimulton.shutdown()
-#    return Message(f'Clock simulton {pid} shutting down...').model_dump()
+#    Handle a request to change the simulton state
+#    '''
+#    if req.rate is not None:
+#        theDerivedSimulton.rate = req.rate
+#    theDerivedSimulton.state = req.state
+#    return theDerivedSimulton.to_response()

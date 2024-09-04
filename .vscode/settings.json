@@ -5,6 +5,7 @@
         "restc",
         "Simulton",
         "simultons",
+        "starlette",
         "uvicorn"
     ],
     "makefile.configureOnOpen": false,

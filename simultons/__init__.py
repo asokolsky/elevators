@@ -6,14 +6,14 @@ from .button import Button, ButtonWithLed, ButtonWithLedPanel
 from .restc import rest_client, wait_until_reachable
 from .schemas import NewClockParams, ClockResponse, \
     NewElevatorParams, ElevatorResponse, Message, \
-    SimulationRequest, SimulationResponse, \
-    NewSimultonParams, SimultonResponse, ShutdownParams
+    SimulationState, SimulationRequest, SimulationResponse, \
+    SimultonState, NewSimultonParams, SimultonRequest, SimultonResponse
 # order is important to avoid circular dependency!
 from .fast_launcher import FastLauncher
 from .simulton import Simulton
 from .elevator import Elevator
 from .clock import Clock
-from .simulation import Simulation, SimulationState, theSimulation
+from .simulation import Simulation, SimultonProxy, theSimulation
 
 __version__ = "0.0.1"
 
@@ -38,17 +38,20 @@ __all__ = [
     # schemas.py
     'NewClockParams',
     'ClockResponse',
+    'SimulationState',
     'SimulationRequest',
     'SimulationResponse',
     'NewElevatorParams',
+    'SimultonState',
     'NewSimultonParams',
+    'SimultonRequest',
     'SimultonResponse',
     'NewElevatorParams',
     'ElevatorResponse',
     'Message',
-    'ShutdownParams',
     # simulation.py
     'Simulation',
     'SimulationState',
-    'theSimulation'
+    'theSimulation',
+    'SimultonProxy'
 ]
