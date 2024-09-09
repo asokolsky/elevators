@@ -9,7 +9,15 @@ import time
 import unittest
 from json import loads
 import httpx
-from simultons import restc
+from simultons import async_rest_client, rest_client
+
+uris = [
+    '/ip', '/html', '/cookies',
+    '/dump/request',
+    '/gzip',
+    # '/image',
+    '/user-agent', '/get', '/headers', '/json', '/uuid'
+]
 
 
 class TestRestC(unittest.TestCase):
@@ -24,11 +32,12 @@ class TestRestC(unittest.TestCase):
         '''
         Executed prior to each test.
         '''
-        self.host = 'httpbin.org'
+        self.host = 'httpbin.io'
         port = 80
-        verbose = True
-        dumpHeaders = True
-        self.cl = restc.rest_client(self.host, port, verbose, dumpHeaders)
+        verbose = False
+        dumpHeaders = False
+        self.cl = rest_client(self.host, port, verbose, dumpHeaders)
+        self.acl = async_rest_client(self.host, port, verbose, dumpHeaders)
 
         return
 
@@ -119,7 +128,7 @@ class TestRestC(unittest.TestCase):
             # 'method': 'POST',
             'origin': '1.8.9.1:57320',
             'url': 'http://httpbin.io/post',
-            'data': '{"a": "value-of-a", "b": 1234, "c": {"d": ["I", "love", "REST"], "e": "done"}}',
+            'data': '{"a": "value-of-a", ... "e": "done"}}',
             'files': {},
             'form': {},
             'json': {
@@ -208,7 +217,7 @@ class TestRestC(unittest.TestCase):
             # 'method': 'PUT',
             'origin': '1.8.9.1:55592',
             'url': 'http://httpbin.io/put',
-            'data': '{"a": "value-of-a", "b": 1234, "c": {"d": ["I", "love", "REST"], "e": "done"}}',
+            'data': '{"a": "value-of-a", ... "e": "done"}}',
             'files': {},
             'form': {},
             'json': {
@@ -260,7 +269,7 @@ class TestRestC(unittest.TestCase):
             # 'method': 'PATCH',
             'origin': '151.83.9.13:38166',
             'url': 'http://httpbin.io/patch',
-            'data': '{"a": "value-of-a", "b": 1234, "c": {"d": ["I", "love", "REST"], "e": "done"}}',
+            'data': '{"a": "value-of-a", ... "e": "done"}}',
             'files': {},
             'form': {},
             'json': {
@@ -288,42 +297,52 @@ class TestRestC(unittest.TestCase):
         self.assertTrue('url' in rdata)
         return
 
-    async def get_one(self, client, uri) -> int:
-        response = await client.get(uri)
-        return response.status_code
+    async def get_one(self, uri) -> int:
+        # response = await client.get(uri)
+        sc, jresp = self.acl.get(uri)
+        return sc
 
     async def get_many(self) -> None:
         '''
         Try to GET multiple URIs in parallel
         '''
-        uris = [
-            '/ip', '/html',
-            #'/dump/request',
-            # '/image',
-            '/user-agent', '/get', '/headers',
-            '/json'
-        ]
-        print(f'Retrieving {len(uris)} URIs')
+        print(f'Retrieving {len(uris)} URIs in parallel')
         start = time.time()
 
-        async with httpx.AsyncClient(base_url=f'http://{self.host}') as client:
-            results = await asyncio.gather(
-                *(self.get_one(client, uri) for uri in uris))
-            print(results)
+        results = await asyncio.gather(*(self.acl.get(uri) for uri in uris))
 
         elapsed = time.time() - start
+        print(results)
         print(f'Retrieved {len(uris)} URIs in {elapsed:.3f} secs')
         return
 
-    def test_multiple_gets(self):
+    def test_multiple_gets_parallel(self):
         '''
         Try rest_client.get in parallel.
         To run just this test:
-        python3 -m unittest --verbose -k test_multiple_gets tests/restc_test.py
+        python3 -m unittest -k test_multiple_gets_p tests/restc_test.py
         '''
         asyncio.run(self.get_many())
         # produces:
-        # Retrieving 7 URIs took 1.454 secs
+        # Retrieved 6 URIs in 1.043 secs
+        return
+
+    def test_multiple_gets_sequential(self):
+        '''
+        To run just this test:
+        python3 -m unittest -k test_multiple_gets_s tests/restc_test.py
+        '''
+        print(f'Retrieving {len(uris)} URIs sequentially')
+        start = time.time()
+
+        for uri in uris:
+            self.cl.get(uri)
+
+        elapsed = time.time() - start
+        print(f'Retrieved {len(uris)} URIs in {elapsed:.3f} secs')
+
+        # produces:
+        # Retrieved 6 URIs in 4.805 secs
         return
 
 

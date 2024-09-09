@@ -4,13 +4,11 @@ Async REST client and other utilities
 from urllib.parse import urljoin
 import time
 from typing import Any, Optional, Tuple
-from httpx import AsyncClient, Response
-from requests import get
-#from requests.exceptions import JSONDecodeError
-JSONDecodeError = Exception
+import httpx
+from json.decoder import JSONDecodeError
 
 
-class rest_client:
+class async_rest_client:
     '''
     Async REST client
     '''
@@ -24,7 +22,7 @@ class rest_client:
         self.base_url = f'http://{host}:{port}'
         self.verbose = verbose
         self.dumpHeaders = dumpHeaders
-        self.ses = AsyncClient()
+        self.ses = httpx.AsyncClient(base_url=self.base_url)
         return
 
     async def close(self) -> None:
@@ -34,20 +32,19 @@ class rest_client:
         await self.ses.aclose()
         return
 
-    def print_req(self, method: str, url: str, data: Optional[Any]) -> None:
+    def print_req(self, method: str, uri: str, data: Optional[Any]) -> None:
         if not self.verbose:
             return
         if data is None:
             data = ''
-        print('HTTP', method, url, data, '...')
+        print('HTTP', method, urljoin(self.base_url, uri), data, '...')
         return
 
-    def print_resp(self, method: str, resp: Response) -> None:
+    def print_resp(self, method: str, resp: httpx.Response) -> None:
         if self.verbose:
             try:
                 jresp = resp.json()
-            except JSONDecodeError as err:
-                print('Caught: ', err)
+            except JSONDecodeError:
                 jresp = resp
             print('HTTP', method, '=>', resp.status_code, str(jresp))
         if self.dumpHeaders:
@@ -62,14 +59,12 @@ class rest_client:
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        url = urljoin(self.base_url, uri)
-        self.print_req('GET', url, None)
-        resp = await self.ses.get(url)
+        self.print_req('GET', uri, None)
+        resp = await self.ses.get(uri)
         self.print_resp('GET', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError as err:
-            print('Caught: ', err)
+        except JSONDecodeError:
             jresp = resp
         return (resp.status_code, jresp)
 
@@ -79,9 +74,8 @@ class rest_client:
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        url = urljoin(self.base_url, uri)
-        self.print_req('POST', url, data)
-        resp = await self.ses.post(url, json=data)
+        self.print_req('POST', uri, data)
+        resp = await self.ses.post(uri, json=data)
         self.print_resp('POST', resp)
         try:
             jresp = resp.json()
@@ -96,14 +90,12 @@ class rest_client:
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        url = urljoin(self.base_url, uri)
-        self.print_req('DELETE', url, None)
-        resp = await self.ses.delete(url)
+        self.print_req('DELETE', uri, None)
+        resp = await self.ses.delete(uri)
         self.print_resp('DELETE', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError as err:
-            print('Caught: ', err)
+        except JSONDecodeError:
             jresp = resp
         return (resp.status_code, jresp)
 
@@ -113,9 +105,8 @@ class rest_client:
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        url = urljoin(self.base_url, uri)
-        self.print_req('PUT', url, data)
-        resp = await self.ses.put(url, json=data)
+        self.print_req('PUT', uri, data)
+        resp = await self.ses.put(uri, json=data)
         self.print_resp('PUT', resp)
         try:
             jresp = resp.json()
@@ -130,9 +121,8 @@ class rest_client:
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        url = urljoin(self.base_url, uri)
-        self.print_req('PATCH', url, data)
-        resp = await self.ses.patch(url, json=data)
+        self.print_req('PATCH', uri, data)
+        resp = await self.ses.patch(uri, json=data)
         self.print_resp('PATCH', resp)
         try:
             jresp = resp.json()
@@ -142,7 +132,7 @@ class rest_client:
         return (resp.status_code, jresp)
 
 
-def wait_until_reachable(url: str, timeout: int) -> Optional[Response]:
+def wait_until_reachable(url: str, timeout: int) -> Optional[httpx.Response]:
     '''
     Wait upto timeout secs until the url is reachable
     '''
@@ -153,13 +143,13 @@ def wait_until_reachable(url: str, timeout: int) -> Optional[Response]:
         time.sleep(0.1)
         try:
             # are we there yet?
-            x = get(url)
-            if x.ok:
+            x = httpx.get(url)
+            if x.status_code == 200:
                 # YES!
                 print(f'\nwait_until_reachable({url}, {timeout}) => {x},'
                       f' after {time.time()-start:.2f} secs')
                 return x
-        except Exception:
+        except httpx.ConnectError:
             print('.', end='', flush=True)
             pass
     print(f'\nwait_until_reachable({url}, {timeout}) => None')

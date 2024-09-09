@@ -2,6 +2,7 @@
 Playing with FastAPI, pydantic while simulating stuff
 '''
 
+from .arestc import async_rest_client
 from .button import Button, ButtonWithLed, ButtonWithLedPanel
 from .restc import rest_client, wait_until_reachable
 from .schemas import NewClockParams, ClockResponse, \
@@ -18,6 +19,8 @@ from .simulation import Simulation, SimultonProxy, theSimulation
 __version__ = "0.0.1"
 
 __all__ = [
+    # arestc.py
+    'async_rest_client',
     # button.py
     'Button',
     'ButtonWithLed',

@@ -10,20 +10,16 @@ from json.decoder import JSONDecodeError
 
 class rest_client:
     '''
-    HTTP client can use requests.request or requests.Session.
-    I prefer the second option because:
-    it allows to make multiple requests over the same pair of the connected
-    sockets. Not only it is more efficient but also allows to carry
-    authentication information. No that this is important.  At least not yet.
+    REST client based on httpx
     '''
 
-    def __init__(self, iface: str, port: int, verbose: bool,
+    def __init__(self, host: str, port: int, verbose: bool,
                  dumpHeaders: bool) -> None:
         '''
         In: iface - server interface, or host name
             port - server port
         '''
-        self.base_url = f'http://{iface}:{port}'
+        self.base_url = f'http://{host}:{port}'
         self.verbose = verbose
         self.dumpHeaders = dumpHeaders
         self.ses = httpx.Client(base_url=self.base_url)
