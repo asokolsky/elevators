@@ -1,54 +1,53 @@
 '''
-REST client and other utilities, now based on httpx, not requests
+Async REST client and other utilities
 '''
 from urllib.parse import urljoin
 import time
 from typing import Any, Optional, Tuple
-import httpx
-from json.decoder import JSONDecodeError
+from httpx import AsyncClient, Response
+from requests import get
+#from requests.exceptions import JSONDecodeError
+JSONDecodeError = Exception
 
 
 class rest_client:
     '''
-    HTTP client can use requests.request or requests.Session.
-    I prefer the second option because:
-    it allows to make multiple requests over the same pair of the connected
-    sockets. Not only it is more efficient but also allows to carry
-    authentication information. No that this is important.  At least not yet.
+    Async REST client
     '''
 
-    def __init__(self, iface: str, port: int, verbose: bool,
+    def __init__(self, host: str, port: int, verbose: bool,
                  dumpHeaders: bool) -> None:
         '''
         In: iface - server interface, or host name
             port - server port
         '''
-        self.base_url = f'http://{iface}:{port}'
+        self.base_url = f'http://{host}:{port}'
         self.verbose = verbose
         self.dumpHeaders = dumpHeaders
-        self.ses = httpx.Client(base_url=self.base_url)
+        self.ses = AsyncClient()
         return
 
-    def close(self):
+    async def close(self) -> None:
         '''
         Close the underlying TCP connection
         '''
-        self.ses.close()
+        await self.ses.aclose()
         return
 
-    def print_req(self, method: str, uri: str, data: Optional[Any]) -> None:
+    def print_req(self, method: str, url: str, data: Optional[Any]) -> None:
         if not self.verbose:
             return
         if data is None:
             data = ''
-        print('HTTP', method, urljoin(self.base_url, uri), data, '...')
+        print('HTTP', method, url, data, '...')
         return
 
-    def print_resp(self, method: str, resp: httpx.Response) -> None:
+    def print_resp(self, method: str, resp: Response) -> None:
         if self.verbose:
             try:
                 jresp = resp.json()
-            except JSONDecodeError:
+            except JSONDecodeError as err:
+                print('Caught: ', err)
                 jresp = resp
             print('HTTP', method, '=>', resp.status_code, str(jresp))
         if self.dumpHeaders:
@@ -57,83 +56,93 @@ class rest_client:
                 print('   ', h, ':', resp.headers[h])
         return
 
-    def get(self, uri: str) -> Tuple[int, Any]:
+    async def get(self, uri: str) -> Tuple[int, Any]:
         '''
         Issue HTTP GET to a base_url + uri
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        self.print_req('GET', uri, None)
-        resp = self.ses.get(uri)
+        url = urljoin(self.base_url, uri)
+        self.print_req('GET', url, None)
+        resp = await self.ses.get(url)
         self.print_resp('GET', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print('Caught: ', err)
             jresp = resp
         return (resp.status_code, jresp)
 
-    def post(self, uri: str, data: Any):
+    async def post(self, uri: str, data: Any):
         '''
         Issue HTTP POST to a base_url + uri
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        self.print_req('POST', uri, data)
-        resp = self.ses.post(uri, json=data)
+        url = urljoin(self.base_url, uri)
+        self.print_req('POST', url, data)
+        resp = await self.ses.post(url, json=data)
         self.print_resp('POST', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print('Caught: ', err)
             jresp = resp
         return (resp.status_code, jresp)
 
-    def delete(self, uri: str) -> Tuple[int, Any]:
+    async def delete(self, uri: str) -> Tuple[int, Any]:
         '''
         Issue HTTP DELETE to a base_url + uri
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        self.print_req('DELETE', uri, None)
-        resp = self.ses.delete(uri)
+        url = urljoin(self.base_url, uri)
+        self.print_req('DELETE', url, None)
+        resp = await self.ses.delete(url)
         self.print_resp('DELETE', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print('Caught: ', err)
             jresp = resp
         return (resp.status_code, jresp)
 
-    def put(self, uri: str, data: Any) -> Tuple[int, Any]:
+    async def put(self, uri: str, data: Any) -> Tuple[int, Any]:
         '''
         Issue HTTP PUT to a base_url + uri
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        self.print_req('PUT', uri, data)
-        resp = self.ses.put(uri, json=data)
+        url = urljoin(self.base_url, uri)
+        self.print_req('PUT', url, data)
+        resp = await self.ses.put(url, json=data)
         self.print_resp('PUT', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print('Caught: ', err)
             jresp = resp
         return (resp.status_code, jresp)
 
-    def patch(self, uri: str, data: Any) -> Tuple[int, Any]:
+    async def patch(self, uri: str, data: Any) -> Tuple[int, Any]:
         '''
         Issue HTTP PATCH to a base_url + uri
         returns (http_status, response_json)
         Throws requests.exceptions.ConnectionError when connection fails
         '''
-        self.print_req('PATCH', uri, data)
-        resp = self.ses.patch(uri, json=data)
+        url = urljoin(self.base_url, uri)
+        self.print_req('PATCH', url, data)
+        resp = await self.ses.patch(url, json=data)
         self.print_resp('PATCH', resp)
         try:
             jresp = resp.json()
-        except JSONDecodeError:
+        except JSONDecodeError as err:
+            print('Caught: ', err)
             jresp = resp
         return (resp.status_code, jresp)
 
 
-def wait_until_reachable(url: str, timeout: int) -> Optional[httpx.Response]:
+def wait_until_reachable(url: str, timeout: int) -> Optional[Response]:
     '''
     Wait upto timeout secs until the url is reachable
     '''
@@ -144,16 +153,14 @@ def wait_until_reachable(url: str, timeout: int) -> Optional[httpx.Response]:
         time.sleep(0.1)
         try:
             # are we there yet?
-            x = httpx.get(url)
-            if x.status_code == 200:
+            x = get(url)
+            if x.ok:
                 # YES!
                 print(f'\nwait_until_reachable({url}, {timeout}) => {x},'
                       f' after {time.time()-start:.2f} secs')
                 return x
-
-        except httpx.ConnectError:
+        except Exception:
             print('.', end='', flush=True)
             pass
-
     print(f'\nwait_until_reachable({url}, {timeout}) => None')
     return None

@@ -6,8 +6,7 @@ import signal
 import subprocess
 import time
 from typing import Any, Dict, Optional
-from requests import get
-from requests.exceptions import RequestException
+import httpx
 from . import rest_client
 
 
@@ -83,15 +82,16 @@ class FastLauncher:
 
             try:
                 # are we there yet?
-                x = get(url, timeout=0.01)
-                if x.ok:
+                x = httpx.get(url, timeout=0.01)
+                if x.status_code == 200:
                     # YES!
                     jres = x.json()
                     print(f'\nwait_until_reachable({url}, {timeout}) => {jres},'
                           f' after {time.time()-start:.2f} secs')
                     return jres
 
-            except RequestException:
+            except httpx.ConnectError:
+                print('.', end='', flush=True)
                 pass
 
         print(f'\nwait_until_reachable({url}, {timeout}) => None')

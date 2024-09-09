@@ -2,7 +2,6 @@
 Test launching/shutting FastAPI server programmatically
 '''
 import unittest
-import requests
 
 from simultons import SimultonProxy, NewElevatorParams
 
@@ -50,12 +49,8 @@ class TestSimulton(unittest.TestCase):
         #
         # verify the FastAPI server is running
         #
-        try:
-            (status_code, rdata) = self.restc.get(simulton_uri)
-            self.assertEqual(status_code, 200)
-        except requests.exceptions.ConnectionError as err:
-            print('Caught:', err)
-            self.assertFalse(err)
+        (status_code, rdata) = self.restc.get(simulton_uri)
+        self.assertEqual(status_code, 200)
         return
 
     def tearDown(self):

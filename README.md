@@ -76,3 +76,20 @@ sudo lsof -i4 |grep LISTEN|grep 5556
 ```sh
 fastapi run simultons/simulation.py
 ```
+
+To watch the simulton processes:
+
+1. use `ps` to identify the pid of the shell;
+2. then
+
+```
+watch -c -n 0.1  pstree -p <pid> -Ut
+```
+
+## TODOs
+
+* simultons to read from the zmq message queue
+
+DONE:
+
+* use [httpx](https://www.python-httpx.org/advanced/clients/) instead of request
