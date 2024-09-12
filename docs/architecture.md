@@ -15,3 +15,15 @@ Simulton is:
 * a process
 * a FastAPI service
 * a zmq subscriber to Simulation publisher
+
+## Major Design Qs
+
+These popped up within hours: How do I programmatically
+
+* [start the FastAPI server?](./fastapi-start.md)
+* [shut the FastAPI server?](./fastapi-shut.md)
+* [add XXX to the FastAPI event loop?](./fastapi-event-loop.md)
+
+## More readings
+
+https://github.com/encode/uvicorn/issues/761
