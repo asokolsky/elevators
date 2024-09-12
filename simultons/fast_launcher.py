@@ -107,10 +107,12 @@ class FastLauncher:
         # wait for the process to actually terminate
         #
         print(f'Waiting for upto {timeout} secs for {self._popen.pid} to die...')
+        start = time.time()
         try:
             self._popen.wait(timeout)
             # the process has terminated
-            print(self._popen.pid, 'died, ec:', self._popen.returncode)
+            elapsed = time.time() - start
+            print(f'{self._popen.pid} died after {elapsed:.3f} secs, ec: {self._popen.returncode}')
             return True
 
         except subprocess.TimeoutExpired:
@@ -137,13 +139,23 @@ class FastLauncher:
         #
         # get the child's stdout and stderr
         #
-        stdout_value, stderr_value = self._popen.communicate()
+        stdout_value = ''
+        stderr_value = ''
+        try:
+            stdout_value, stderr_value = self._popen.communicate()
+        except Exception as err:
+            print('Caught while tying to communicate with', self._popen.pid,
+                  err)
         dashes = '==========================='
         print(dashes, self._path, self._popen.pid, 'stdout', dashes, '\n',
               stdout_value,
               dashes, self._path, self._popen.pid, 'stderr', dashes, '\n',
               stderr_value,
               dashes, self._path, self._popen.pid, 'end', dashes)
+
+        # close the socket
+        self._restc.close()
+        self._restc = None
         return res
 
     def get_rest_client(self, verbose: bool, dumpHeaders: bool):

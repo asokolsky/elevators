@@ -8,7 +8,6 @@ import asyncio
 import time
 import unittest
 from json import loads
-import httpx
 from simultons import async_rest_client, rest_client
 
 uris = [
@@ -18,6 +17,7 @@ uris = [
     # '/image',
     '/user-agent', '/get', '/headers', '/json', '/uuid'
 ]
+user_agent = ['python-httpx/0.27.2']
 
 
 class TestRestC(unittest.TestCase):
@@ -34,7 +34,7 @@ class TestRestC(unittest.TestCase):
         '''
         self.host = 'httpbin.io'
         port = 80
-        verbose = False
+        verbose = True
         dumpHeaders = False
         self.cl = rest_client(self.host, port, verbose, dumpHeaders)
         self.acl = async_rest_client(self.host, port, verbose, dumpHeaders)
@@ -56,13 +56,13 @@ class TestRestC(unittest.TestCase):
         (status_code, rdata) = self.cl.get(uri)
         self.assertEqual(status_code, 200)
         self.assertEqual(len(rdata), 1)
-        self.assertTrue('origin' in rdata)
+        self.assertIn('origin', rdata)
 
         uri = '/user-agent'
         (status_code, rdata) = self.cl.get(uri)
         self.assertEqual(status_code, 200)
         self.assertEqual(len(rdata), 1)
-        self.assertTrue('user-agent' in rdata)
+        self.assertIn('user-agent', rdata)
         ua = rdata['user-agent']
         self.assertTrue(ua.startswith('python'))
 
@@ -76,27 +76,24 @@ class TestRestC(unittest.TestCase):
                 'Accept-Encoding': ['gzip, deflate'],
                 'Connection': ['keep-alive'],
                 'Host': [self.host],
-                'User-Agent': 'python-httpx/0.27.2'
+                'User-Agent': user_agent
             },
-            # 'method': 'GET', optional
+            'method': 'GET',  # optional
             'origin': '1.8.9.1:37470',
-            'url': 'http://httpbin.io/get'
+            'url': f'http://{self.host}/get'
         }
         self.assertEqual(len(rdata), len(expected))
-        self.assertEqual(rdata['args'], {})
-        self.assertTrue('headers' in rdata)
-        # self.assertEqual(rdata['method'], 'GET')
-        self.assertTrue('origin' in rdata)
-        self.assertTrue('url' in rdata)
-
+        for hdr in ('args', 'method', 'url'):
+            self.assertEqual(rdata[hdr], expected[hdr])
+        self.assertIn('origin', rdata)
+        self.assertIn('headers', rdata)
         headers = rdata['headers']
         # self.assertEqual(len(headers), 6)
-        self.assertTrue('Accept' in headers)
-        self.assertTrue('Accept-Encoding' in headers)
-        # self.assertTrue('Cache-Control' in headers)
-        # self.assertTrue('If-Modified-Since' in headers)
-        self.assertTrue('Host' in headers)
-        self.assertTrue('User-Agent' in headers)
+        for hdr in ('Accept', 'Accept-Encoding', 'Host', 'User-Agent'):
+            self.assertEqual(headers[hdr], expected['headers'][hdr])
+
+        # self.assertIn('Cache-Control', headers)
+        # self.assertIn('If-Modified-Since', headers)
         return
 
     def test_post(self):
@@ -123,9 +120,9 @@ class TestRestC(unittest.TestCase):
                 'Content-Length': ['78'],
                 'Content-Type': ['application/json'],
                 'Host': [self.host],
-                'User-Agent': 'python-httpx/0.27.2'
+                'User-Agent': user_agent
             },
-            # 'method': 'POST',
+            'method': 'POST',
             'origin': '1.8.9.1:57320',
             'url': 'http://httpbin.io/post',
             'data': '{"a": "value-of-a", ... "e": "done"}}',
@@ -141,15 +138,20 @@ class TestRestC(unittest.TestCase):
             }
         }
         self.assertEqual(len(rdata), len(expected))
-        self.assertTrue('args' in rdata)
-        self.assertEqual(rdata['args'], {})
-        self.assertTrue('data' in rdata)
+        for hdr in ('args', 'method', 'files', 'url'):
+            self.assertEqual(rdata[hdr], expected[hdr])
+        self.assertIn('data', rdata)
         self.assertEqual(loads(rdata['data']), da)
-        self.assertTrue('files' in rdata)
-        self.assertTrue('form' in rdata)
-        self.assertTrue('headers' in rdata)
-        self.assertTrue('origin' in rdata)
-        self.assertTrue('url' in rdata)
+        self.assertIn('origin', rdata)
+
+        self.assertIn('headers', rdata)
+        headers = rdata['headers']
+        # self.assertEqual(len(headers), 6)
+        for hdr in ('Accept', 'Accept-Encoding', 'Host', 'User-Agent'):
+            self.assertEqual(headers[hdr], expected['headers'][hdr])
+
+        # self.assertIn('Cache-Control', headers)
+        # self.assertIn('If-Modified-Since', headers)
         return
 
     def test_delete(self):
@@ -167,9 +169,9 @@ class TestRestC(unittest.TestCase):
                 'Connection': ['keep-alive'],
                 'Content-Length': ['0'],
                 'Host': [self.host],
-                'User-Agent': 'python-httpx/0.27.2'
+                'User-Agent': user_agent
             },
-            # 'method': 'DELETE',
+            'method': 'DELETE',
             'origin': '1.8.9.1:42064',
             'url': f'http://{self.host}/delete',
             'data': '',
@@ -178,14 +180,13 @@ class TestRestC(unittest.TestCase):
             'json': None
         }
         self.assertEqual(len(rdata), len(expected))
-        self.assertEqual(rdata['args'], {})
-        self.assertEqual(rdata['data'], '')
-        self.assertEqual(rdata['files'], {})
-        self.assertEqual(rdata['form'], {})
-        self.assertTrue('headers' in rdata)
-        self.assertTrue('json' in rdata)
-        self.assertTrue('origin' in rdata)
-        self.assertTrue('url' in rdata)
+        for hdr in ('args', 'method', 'data', 'files', 'form', 'json', 'url'):
+            self.assertEqual(rdata[hdr], expected[hdr])
+
+        self.assertIn('headers', rdata)
+        headers = rdata['headers']
+        for hdr in ('Accept', 'Accept-Encoding', 'Host', 'User-Agent'):
+            self.assertEqual(headers[hdr], expected['headers'][hdr])
         return
 
     def test_put(self):
@@ -212,9 +213,9 @@ class TestRestC(unittest.TestCase):
                 'Content-Length': ['78'],
                 'Content-Type': ['application/json'],
                 'Host': [self.host],
-                'User-Agent': 'python-httpx/0.27.2'
+                'User-Agent': user_agent
             },
-            # 'method': 'PUT',
+            'method': 'PUT',
             'origin': '1.8.9.1:55592',
             'url': 'http://httpbin.io/put',
             'data': '{"a": "value-of-a", ... "e": "done"}}',
@@ -230,14 +231,14 @@ class TestRestC(unittest.TestCase):
             }
         }
         self.assertEqual(len(rdata), len(expected))
-        self.assertEqual(rdata['args'], {})
+        for hdr in ('args', 'method', 'files', 'form', 'json', 'url'):
+            self.assertEqual(rdata[hdr], expected[hdr], hdr)
         self.assertEqual(loads(rdata['data']), da)
-        self.assertEqual(rdata['files'], {})
-        self.assertEqual(rdata['form'], {})
-        self.assertTrue('headers' in rdata)
-        self.assertEqual(rdata['json'], da)
-        self.assertTrue('origin' in rdata)
-        self.assertTrue('url' in rdata)
+        self.assertIn('origin', rdata)
+        self.assertIn('headers', rdata)
+        headers = rdata['headers']
+        for hdr in ('Accept', 'Accept-Encoding', 'Host', 'User-Agent'):
+            self.assertEqual(headers[hdr], expected['headers'][hdr])
         return
 
     def test_patch(self):
@@ -264,9 +265,9 @@ class TestRestC(unittest.TestCase):
                 'Content-Length': ['78'],
                 'Content-Type': ['application/json'],
                 'Host': [self.host],
-                'User-Agent': 'python-httpx/0.27.2'
+                'User-Agent': user_agent
             },
-            # 'method': 'PATCH',
+            'method': 'PATCH',
             'origin': '151.83.9.13:38166',
             'url': 'http://httpbin.io/patch',
             'data': '{"a": "value-of-a", ... "e": "done"}}',
@@ -282,19 +283,14 @@ class TestRestC(unittest.TestCase):
             }
         }
         self.assertEqual(len(rdata), len(expected))
-        self.assertTrue('args' in rdata)
-        self.assertEqual(rdata['args'], {})
-        self.assertTrue('data' in rdata)
+        for hdr in ('args', 'method', 'files', 'form', 'json', 'url'):
+            self.assertEqual(rdata[hdr], expected[hdr])
         self.assertEqual(loads(rdata['data']), da)
-        self.assertTrue('files' in rdata)
-        self.assertEqual(rdata['files'], {})
-        self.assertTrue('form' in rdata)
-        self.assertEqual(rdata['form'], {})
-        self.assertTrue('headers' in rdata)
-        self.assertTrue('json' in rdata)
-        self.assertEqual(rdata['json'], da)
-        self.assertTrue('origin' in rdata)
-        self.assertTrue('url' in rdata)
+        self.assertIn('origin', rdata)
+        self.assertIn('headers', rdata)
+        headers = rdata['headers']
+        for hdr in ('Accept', 'Accept-Encoding', 'Host', 'User-Agent'):
+            self.assertEqual(headers[hdr], expected['headers'][hdr])
         return
 
     async def get_one(self, uri) -> int:

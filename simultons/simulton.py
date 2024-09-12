@@ -6,13 +6,19 @@ A simulton is:
 
 This simulton is not related to https://ogden.eu/simultons/
 '''
+import asyncio
+import json
 import os
 import random
 import signal
 import string
 from typing import Any, Dict
 from fastapi import FastAPI
-from . import SimultonResponse, SimultonState
+import zmq
+import zmq.asyncio
+from .globals import simulation_zspec, simulation_ztopic
+from . import SimulationState, SimulationResponse, \
+    SimultonResponse, SimultonState
 
 
 def get_random_id() -> str:
@@ -24,7 +30,7 @@ def get_random_id() -> str:
 class Simulton:
     '''
     A unit of simulation with REST API exposed via FastAPI(s).
-    This class is ued as a parent to an actual class to be instantiated in the
+    This class is used as a parent to an actual class to be instantiated in the
     simulton process.
     '''
     title = 'FooBar'
@@ -37,13 +43,52 @@ class Simulton:
         if not name:
             name = f'{type(self).__qualname__}@{hex(id(self))}'
         self._name = name
+        # start zmq subscriber, will be destroyed in on_shutdown
+        self._zcontext = zmq.asyncio.Context()
+        self._zsocket = self._zcontext.socket(zmq.SUB)
+        self._zsocket.setsockopt(zmq.SUBSCRIBE, simulation_ztopic.encode())
+        self._zsocket.connect(simulation_zspec)
+
         # map of instance ID to the instance itself
         self._instances: Dict[str, Any] = {}
         return
 
+    async def recv_zmq_string(self) -> str:
+        '''
+        Background async task to receive zmq data
+        '''
+        print('Simulton.recv_zmq_string..')
+        res = await self._zsocket.recv_string()
+        print('Simulton.recv_zmq_string() =>', res)
+        topic, message = res.split()
+        assert topic == simulation_ztopic
+        # dispatch message
+        from pydantic import parse_obj_as
+        try:
+            self.on_simulation_state_update(
+                parse_obj_as(SimulationResponse, json.loads(message)))
+        except json.JSONDecodeError as err:
+            print('recv_zmq_string caught JSONDecodeError', err)
+        except Exception as err:
+            print('recv_zmq_string caught Exception', err)
+
+        return message
+
+    def on_simulation_state_update(self, resp: SimulationResponse) -> None:
+        print('on_simulation_state_update', resp)
+        if resp.state == SimulationState.PAUSED:
+            self.state = SimultonState.PAUSED
+        elif resp.state == SimulationState.RUNNING:
+            self.state = SimultonState.RUNNING
+        elif resp.state == SimulationState.SHUTTING:
+            self.state = SimultonState.SHUTTING
+        else:
+            assert False
+        return
+
     @property
     def state(self) -> SimultonState:
-        '''Simulton state'''
+        '''Simulton state accessor'''
         return self._state
 
     @state.setter
@@ -115,13 +160,16 @@ class Simulton:
         '''
         State just transitioned to SHUTTING
         '''
-        print('Simulton.on_shutting')
+        print('Simulton.on_shutting', self)
+        self.shutdown()
         return
 
     def on_startup(self) -> None:
         '''
         Simulton FastAPI app startup event handler
         '''
+        # prepare to read from the zmq socket
+        asyncio.create_task(self.recv_zmq_string())
         self.state = SimultonState.PAUSED
         return
 
@@ -129,8 +177,18 @@ class Simulton:
         '''
         Simulton FastAPI app shutdown event handler
         '''
-        if self.state != SimultonState.SHUTTING:
-            self.shutdown()
+        print('Simulton.on_shutdown', self)
+        #if self.state != SimultonState.SHUTTING:
+        #    self.shutdown()
+        # close the zmq subscriber
+        # https://zguide.zeromq.org/docs/chapter1/#Making-a-Clean-Exit
+        # to avoid hanging infinitely
+        try:
+            self._zsocket.setsockopt(zmq.LINGER, 0)
+            self._zsocket.close()
+            self._zcontext.term()
+        except Exception as e:
+            print('Caught:', type(e), e)
         return
 
     def shutdown(self) -> None:
@@ -159,10 +217,12 @@ class Simulton:
         del self._instances[id]
         return
 
-    def create_app(self) -> FastAPI:
+    @classmethod
+    def create_app(cls) -> FastAPI:
+        print('Creating a FastAPI app', cls.description)
         return FastAPI(
-            title=self.title, description=self.description,
-            version=self.version)
+            title=cls.title, description=cls.description,
+            version=cls.version)
 
     def to_response(self) -> SimultonResponse:
         return SimultonResponse(
@@ -175,20 +235,27 @@ class Simulton:
 #
 # the derivatives have to have these:
 #
-# theDerivedSimulton = ClockSimulton()
+# theDerivedSimulton = Optional[Simulation] = None # ClockSimulton()
+# let's try to delay instantiation to ensure that just importing the package
+# does NOT create network resources
 #
-# app = theDerivedSimulton.create_app()
+# app = DerivedSimulton.create_app()
 
 # @app.on_event('startup')
 # async def startup_event():
 #     print('simulation startup_event')
+#     global theDerivedSimulton
+#     theDerivedSimulton = DerivedSimulton()
 #     theDerivedSimulton.on_startup()
 #     return
 
 # @app.on_event('shutdown')
 # async def shutdown_event():
 #     print('simulation shutdown_event')
+#     global theDerivedSimulton
+#     assert theDerivedSimulton is not None
 #     theDerivedSimulton.on_shutdown()
+#     theDerivedSimulton = None
 #     return
 
 # @app.get('/api/v1/simulton', response_model=SimultonResponse)

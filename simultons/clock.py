@@ -2,7 +2,7 @@
 Clock simulation & simulton
 '''
 import time
-from typing import Dict
+from typing import Dict, Optional
 from fastapi.responses import JSONResponse
 from . import SimultonState, Simulton, SimultonRequest, SimultonResponse, \
     NewClockParams, ClockResponse, Message
@@ -107,22 +107,26 @@ class ClockSimulton(Simulton):
         return
 
 
-theClockSimulton = ClockSimulton()
+theClockSimulton: Optional[ClockSimulton] = None
 
-app = theClockSimulton.create_app()
+app = ClockSimulton.create_app()
 
 
 @app.on_event('startup')
 async def startup_event():
     print('clock simulton startup_event')
+    global theClockSimulton
+    theClockSimulton = ClockSimulton()
     theClockSimulton.on_startup()
     return
 
 
 @app.on_event('shutdown')
 async def shutdown_event():
-    print('clock simulton shutdown_event')
+    global theClockSimulton
+    print('clock simulton shutdown_event', theClockSimulton)
     theClockSimulton.on_shutdown()
+    theClockSimulton = None
     return
 
 
@@ -141,6 +145,7 @@ async def put_simulton(req: SimultonRequest):
     '''
     Handle a request to change the simulton state
     '''
+    assert theClockSimulton is not None
     if req.rate is not None:
         theClockSimulton.rate = req.rate
     theClockSimulton.state = req.state
@@ -152,6 +157,8 @@ async def get_instances():
     '''
     Get all the instances
     '''
+    if theClockSimulton is None:
+        return {}
     return {
         id: cl.to_response().model_dump()
         for id, cl in theClockSimulton.instances.items()
@@ -166,6 +173,7 @@ async def create_instance(params: NewClockParams):
     '''
     Handle new instance creation
     '''
+    assert theClockSimulton is not None
     cl = Clock(theClockSimulton, params.name)
     return cl.to_response().model_dump()
 
@@ -175,6 +183,7 @@ async def get_clock(id: str):
     '''
     Get the simulated time
     '''
+    assert theClockSimulton is not None
     try:
         cl: Clock = theClockSimulton.get_instance_by_id(id)
         return cl.to_response().model_dump()
@@ -189,6 +198,7 @@ async def delete_clock(id: str):
     '''
     Get the simulated time
     '''
+    assert theClockSimulton is not None
     try:
         theClockSimulton.del_instance_by_id(id)
         return

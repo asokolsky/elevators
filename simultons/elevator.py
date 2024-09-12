@@ -201,28 +201,33 @@ class ElevatorSimulton(Simulton):
         return
 
 
-theElevatorSimulton = ElevatorSimulton()
-
-app = theElevatorSimulton.create_app()
+theElevatorSimulton: Optional[ElevatorSimulton] = None
+app = ElevatorSimulton.create_app()
 
 
 @app.on_event('startup')
 async def startup_event():
     print('elevators startup_event')
+    global theElevatorSimulton
+    theElevatorSimulton = ElevatorSimulton()
     theElevatorSimulton.on_startup()
     return
 
 
 @app.on_event('shutdown')
 async def shutdown_event():
-    print('elevators shutdown_event')
+    global theElevatorSimulton
+    print('elevators shutdown_event', theElevatorSimulton)
     theElevatorSimulton.on_shutdown()
+    theElevatorSimulton = None
     return
 
 
 @app.get('/api/v1/simulton', response_model=SimultonResponse)
 async def get_simulton():
     print('get elevator simulton')
+    global theElevatorSimulton
+    assert theElevatorSimulton is not None
     return theElevatorSimulton.to_response()
 
 
@@ -235,6 +240,8 @@ async def put_simulton(req: SimultonRequest):
     '''
     Handle a request to change the simulton state
     '''
+    global theElevatorSimulton
+    assert theElevatorSimulton is not None
     if req.rate is not None:
         theElevatorSimulton.rate = req.rate
     theElevatorSimulton.state = req.state
@@ -246,6 +253,9 @@ async def get_instances():
     '''
     Get all the elevators
     '''
+    global theElevatorSimulton
+    if theElevatorSimulton is None:
+        return {}
     return {
         id: el.to_response().model_dump()
         for id, el in theElevatorSimulton.instances.items()
@@ -260,6 +270,8 @@ async def create_instance(params: NewElevatorParams):
     '''
     Handle new instance creation
     '''
+    global theElevatorSimulton
+    assert theElevatorSimulton is not None
     el = Elevator(theElevatorSimulton, params.name, params.floors)
     return el.to_response().model_dump()
 
@@ -270,7 +282,8 @@ async def get_elevator(id: str):
     '''
     Get the specific elevator
     '''
-    global elevators   # [global-variable-not-assigned]
+    global theElevatorSimulton
+    assert theElevatorSimulton is not None
     try:
         el = theElevatorSimulton.get_instance_by_id(id)
         return el.to_response().model_dump()

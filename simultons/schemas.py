@@ -55,7 +55,6 @@ class SimulationState(StrEnum):
     Possible values of the simulation state
     '''
     INIT = auto()
-    INITIALIZING = auto()
     PAUSED = auto()
     RUNNING = auto()
     SHUTTING = auto()

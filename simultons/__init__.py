@@ -5,6 +5,7 @@ Playing with FastAPI, pydantic while simulating stuff
 from .arestc import async_rest_client
 from .button import Button, ButtonWithLed, ButtonWithLedPanel
 from .restc import rest_client, wait_until_reachable
+from .globals import simulation_zspec, simulation_ztopic
 from .schemas import NewClockParams, ClockResponse, \
     NewElevatorParams, ElevatorResponse, Message, \
     SimulationState, SimulationRequest, SimulationResponse, \
@@ -16,9 +17,12 @@ from .elevator import Elevator
 from .clock import Clock
 from .simulation import Simulation, SimultonProxy, theSimulation
 
-__version__ = "0.0.1"
+__version__ = '0.0.1'
 
 __all__ = [
+    # globals.py
+    'simulation_ztopic',
+    'simulation_zspec',
     # arestc.py
     'async_rest_client',
     # button.py

@@ -2,8 +2,9 @@
 Testing the simulation stuff
 '''
 import time
-import unittest
 from typing import Dict
+import unittest
+import httpx
 
 from simultons import wait_until_reachable, FastLauncher, \
     SimulationState, SimulationRequest, NewSimultonParams, SimultonResponse
@@ -63,11 +64,17 @@ class TestSimulation(unittest.TestCase):
     def tearDown(self):
         print('TestSimulation.tearDown')
         # request simulation process shutdown
-        req = SimulationRequest(state=SimulationState.SHUTTING)
-        (status_code, rdata) = self.restc.put(simulation_uri, req.model_dump())
-        self._service.wait_to_die(3)
+        try:
+            req = SimulationRequest(state=SimulationState.SHUTTING)
+            (status_code, rdata) = self.restc.put(
+                simulation_uri, req.model_dump())
+            self._service.wait_to_die(5)
+        except httpx.ReadTimeout as err:
+            print('Caught in TestSimulation.tearDown:', err)
+            pass
 
-        self._service.shutdown()
+        time.sleep(0.1)
+        self._service.shutdown(timeout=3)
         self._service = None
 
         # self.restc.close()
@@ -77,6 +84,7 @@ class TestSimulation(unittest.TestCase):
     def test_minimal(self) -> None:
         '''
         Minimum test of the simulation API
+        python3 -m unittest -k test_minimal tests/simulation_test.py
         '''
         assert self.restc is not None
         (status_code, rdata) = self.restc.get(simulation_uri)
@@ -136,8 +144,14 @@ class TestSimulation(unittest.TestCase):
 
     def test_many_simultons(self) -> None:
         '''
+        Test N simultons
+
         To run this test alone:
         python3 -m unittest -k test_many_simultons tests/simulation_test.py
+        To watch the simulton processes:
+            1. use `ps` to identify the pid of the shell;
+            2. then
+            watch -c -n 0.1  pstree -p <shell-pid> -Ut
         '''
         assert self.restc is not None
         (status_code, rdata) = self.restc.get(simulation_uri)
@@ -153,7 +167,7 @@ class TestSimulation(unittest.TestCase):
         # create a few clock simultons
         #
         start = time.time()
-        N = 2
+        N = 15
         sims = self.create_clock_simultons(N)
         now = time.time()
         print(f'Created {N} simultons in {now-start} secs')

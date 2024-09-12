@@ -4,12 +4,14 @@ Simulation launcher which in turn launches all the simultons
 # import asyncio
 import os
 import signal
-from typing import Dict
+from typing import Dict, Optional
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.background import BackgroundTask
 import zmq
-from . import FastLauncher,  \
+import zmq.asyncio
+from .globals import simulation_zspec, simulation_ztopic
+from . import FastLauncher, \
     SimulationState, SimulationRequest, SimulationResponse, \
     SimultonState, Simulton, NewSimultonParams, \
     SimultonRequest, SimultonResponse, Message
@@ -84,15 +86,11 @@ class SimultonProxy(Simulton):
         '''
         Shut the simulton process
         '''
-        params = SimultonRequest(state=SimultonState.SHUTTING)
-        (status_code, rdata) = self._launcher._restc.put(
-            self.simulton_uri, params.model_dump())
-        # if status_code != 202:
-        self._launcher.shutdown()
+        self._launcher.shutdown(timeout=1)
         return
 
 
-async def exit_app():
+async def shut_the_process():
     '''
     This is how we exit FastAPI app
     '''
@@ -108,9 +106,9 @@ class Simulation:
     '''
     Simulation launcher
     '''
-    # _zspec = "tcp://*:5556"
-    # _zspec = "ipc:///var/run/sss"
-    _zspec = "ipc:///tmp/sss"
+
+    _zspec = simulation_zspec
+    _ztopic = simulation_ztopic
 
     def __init__(self) -> None:
         '''
@@ -119,13 +117,24 @@ class Simulation:
         self._state = SimulationState.INIT
         # start in paused
         self._rate = 0.0
-        # start zmq publisher
-        self._zcontext = zmq.Context()
+        # start zmq publisher - destroyed in on_shutdown
+        self._zcontext = zmq.asyncio.Context()
         self._zsocket = self._zcontext.socket(zmq.PUB)
         self._zsocket.bind(self._zspec)
-
+        # simulton accumulator
         self._simultons: Dict[int, SimultonProxy] = {}
         self._next_simulton_port = 9500
+        return
+
+    async def broadcast_state_update(self) -> None:
+        '''
+        share the state update with the subscribers
+        '''
+        message = SimulationResponse(
+            state=self._state, rate=self._rate).model_dump_json()
+        assert self._zsocket is not None
+        print('Broadcasting state update:', message)
+        self._zsocket.send_string(f'{self._ztopic} {message}')
         return
 
     @property
@@ -133,15 +142,13 @@ class Simulation:
         '''Simulation state'''
         return self._state
 
-    @state.setter
-    def state(self, state: SimulationState) -> SimulationState:
+    async def setState(self, state: SimulationState) -> SimulationState:
         if self._state == state:
             return state
         print(f'Simulation state {self._state} -> {state}')
+        # update the state first
         self._state = state
-        # share the sate update with the subscribers
-        self._zsocket.send_string(SimulationResponse(
-            state=self._state, rate=self._rate).model_dump_json())
+        await self.broadcast_state_update()
         if state == SimulationState.RUNNING:
             self.on_running()
         elif state == SimulationState.PAUSED:
@@ -192,44 +199,38 @@ class Simulation:
         State just transitioned to PAUSED
         '''
         print('Simulation.on_paused')
-        for _, s in self._simultons.items():
-            s.pause()
         return
 
     def on_shutting(self) -> None:
         '''
-        State just transitioned to SHUTTING
+        Simulation state just transitioned to SHUTTING
         '''
-        print('Simulation.on_shutting')
-        # TODO: make tis an async using httpx
-        # https://stackoverflow.com/questions/71516140/fastapi-runs-api-calls-in-serial-instead-of-parallel-fashion/71517830#71517830
-        for _, s in self._simultons.items():
-            s.shutdown()
-        # TODO  wait for all the simultons to shut...
+        print('Simulation.on_shutting', self)
         return
 
-    def on_startup(self) -> None:
+    async def on_startup(self) -> None:
         '''
         Simulation FastAPI startup event handler
         '''
         print('Simulation.on_startup')
-        self.state = SimulationState.PAUSED
+        await self.setState(SimulationState.PAUSED)
         return
 
-    def on_shutdown(self) -> None:
+    async def on_shutdown(self) -> None:
         '''
         Simulation FastAPI shutdown event handler
         '''
-        print('Simulation.on_shutdown')
-        self.state = SimulationState.SHUTTING
-        return
-
-    def shutdown(self) -> None:
-        '''
-        Simulation shutdown handler
-        '''
-        if self.state != SimulationState.SHUTTING:
-            self.state = SimulationState.SHUTTING
+        print('Simulation.on_shutdown', self)
+        await self.setState(SimulationState.SHUTTING)
+        print('Shutting the simultons')
+        for _, s in self._simultons.items():
+            s.shutdown()
+        print('Closing zmq publisher')
+        # close the zmq publisher
+        # to avoid hanging infinitely
+        self._zsocket.setsockopt(zmq.LINGER, 0)
+        self._zsocket.close()
+        self._zcontext.term()
         return
 
     def create_simulton(self, params: NewSimultonParams) -> SimultonResponse:
@@ -247,7 +248,9 @@ class Simulation:
         return SimulationResponse(state=self.state, rate=self.rate)
 
 
-theSimulation = Simulation()
+theSimulation: Optional[Simulation] = None  # Simulation()
+# let's try to delay instantiation to ensure that just importing the package
+# does NOT create network resources
 
 
 '''
@@ -262,14 +265,19 @@ app = FastAPI(
 @app.on_event('startup')
 async def startup_event():
     print('simulation startup_event')
-    theSimulation.on_startup()
+    global theSimulation
+    theSimulation = Simulation()
+    await theSimulation.on_startup()
     return
 
 
 @app.on_event('shutdown')
-def shutdown_event():
+async def shutdown_event():
     print('simulation shutdown_event')
-    theSimulation.on_shutdown()
+    global theSimulation
+    assert theSimulation is not None
+    await theSimulation.on_shutdown()
+    theSimulation = None
     return
 
 
@@ -278,6 +286,7 @@ async def get_simulation():
     '''
     Get the simulation state
     '''
+    assert theSimulation is not None
     return SimulationResponse(
         state=theSimulation.state, rate=theSimulation.rate).model_dump()
 
@@ -287,21 +296,23 @@ async def get_simulation():
     response_model=SimulationResponse,
     status_code=202,
     responses={400: {"model": Message}})
-def put_simulation(req: SimulationRequest):
+async def put_simulation(req: SimulationRequest):
     '''
     Update the simulation state
     '''
+    assert theSimulation is not None
     if req.rate is not None:
         theSimulation.rate = req.rate
     # this assignment will result in multiple functions being called
-    theSimulation.state = req.state
+    await theSimulation.setState(req.state)
     if theSimulation.state == SimulationState.SHUTTING:
-        background = BackgroundTask(exit_app)
+        background = BackgroundTask(shut_the_process)
     else:
         background = None
     content = SimulationResponse(
         state=theSimulation.state, rate=theSimulation.rate).model_dump()
     return JSONResponse(content=content, background=background)
+
 
 @app.post(
     '/api/v1/simultons',
@@ -312,6 +323,7 @@ async def create_simulton(params: NewSimultonParams):
     '''
     Handle new simulton creation
     '''
+    assert theSimulation is not None
     try:
         return theSimulation.create_simulton(params)
     except ValueError as err:
@@ -324,6 +336,7 @@ async def get_simultons():
     '''
     Get the simulation rate
     '''
+    assert theSimulation is not None
     return {
         port: s.to_response()
         for port, s in theSimulation._simultons.items()
@@ -338,6 +351,7 @@ async def get_simulton(id: int):
     '''
     Get the simulation rate
     '''
+    assert theSimulation is not None
     try:
         sim = theSimulation._simultons[id]
     except IndexError:
