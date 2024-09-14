@@ -12,7 +12,7 @@ from .schemas import NewClockParams, ClockResponse, \
     SimultonState, NewSimultonParams, SimultonRequest, SimultonResponse
 # order is important to avoid circular dependency!
 from .fast_launcher import FastLauncher
-from .simulton import Simulton
+from .simulton import Simulton, shut_the_process
 from .elevator import Elevator
 from .clock import Clock
 from .simulation import Simulation, SimultonProxy, theSimulation
@@ -42,6 +42,7 @@ __all__ = [
     'wait_until_reachable',
     # simulton.py
     'Simulton',
+    'shut_the_process',
     # schemas.py
     'NewClockParams',
     'ClockResponse',

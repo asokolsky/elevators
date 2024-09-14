@@ -231,21 +231,14 @@ async def get_simulton():
     return theElevatorSimulton.to_response()
 
 
-@app.put(
-    '/api/v1/simulton',
-    response_model=SimultonResponse,
-    status_code=202,
-    responses={400: {"model": Message}})
+@app.put('/api/v1/simulton')
 async def put_simulton(req: SimultonRequest):
     '''
     Handle a request to change the simulton state
     '''
     global theElevatorSimulton
     assert theElevatorSimulton is not None
-    if req.rate is not None:
-        theElevatorSimulton.rate = req.rate
-    theElevatorSimulton.state = req.state
-    return theElevatorSimulton.to_response()
+    return theElevatorSimulton.on_put_simulton(req)
 
 
 @app.get('/api/v1/elevators/', response_model=Dict[str, ElevatorResponse])
@@ -287,6 +280,21 @@ async def get_elevator(id: str):
     try:
         el = theElevatorSimulton.get_instance_by_id(id)
         return el.to_response().model_dump()
+    except KeyError:
+        pass
+    content = Message("Item not found").model_dump()
+    return JSONResponse(status_code=404, content=content)
+
+
+@app.delete('/api/v1/elevators/{id}')
+async def delete_elevator(id: str):
+    '''
+    Delete the elevator
+    '''
+    assert theElevatorSimulton is not None
+    try:
+        theElevatorSimulton.del_instance_by_id(id)
+        return
     except KeyError:
         pass
     content = Message("Item not found").model_dump()

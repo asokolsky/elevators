@@ -1,9 +1,6 @@
 '''
 Simulation launcher which in turn launches all the simultons
 '''
-# import asyncio
-import os
-import signal
 from typing import Dict, Optional
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -14,7 +11,7 @@ from .globals import simulation_zspec, simulation_ztopic
 from . import FastLauncher, \
     SimulationState, SimulationRequest, SimulationResponse, \
     SimultonState, Simulton, NewSimultonParams, \
-    SimultonRequest, SimultonResponse, Message
+    SimultonRequest, SimultonResponse, Message, shut_the_process
 
 
 class SimultonProxy(Simulton):
@@ -66,7 +63,7 @@ class SimultonProxy(Simulton):
 
     def pause(self) -> bool:
         '''
-        Move the simulton into the PAUSED state
+        Send a request to the simulton to move to the PAUSED state
         '''
         params = SimultonRequest(state=SimultonState.PAUSED)
         (status_code, rdata) = self._launcher._restc.put(
@@ -75,31 +72,31 @@ class SimultonProxy(Simulton):
 
     def run(self, rate: float = 1.0) -> bool:
         '''
-        Move the simulton into the RUNNING state
+        Send a request to the simulton to move to the RUNNING state
         '''
         params = SimultonRequest(state=SimultonState.RUNNING, rate=rate)
         (status_code, rdata) = self._launcher._restc.put(
             self.simulton_uri, params.model_dump())
         return status_code == 202
 
+    def shutting(self) -> bool:
+        '''
+        Send a request to the simulton to move to the SHUTTING state
+        '''
+        params = SimultonRequest(state=SimultonState.SHUTTING)
+        (status_code, rdata) = self._launcher._restc.put(
+            self.simulton_uri, params.model_dump())
+        return status_code == 202
+
     def shutdown(self):
         '''
-        Shut the simulton process
+        Forcefully shut the simulton process
         '''
         self._launcher.shutdown(timeout=1)
         return
 
-
-async def shut_the_process():
-    '''
-    This is how we exit FastAPI app
-    '''
-    # loop = asyncio.get_running_loop()
-    # loop.stop()
-    pid = os.getpid()
-    os.kill(pid, signal.SIGTERM)
-    print(f'Simulation {pid} shutting down...')
-    return
+    def wait_to_die(self, timeout: float = 0.5) -> bool:
+        return self._launcher.wait_to_die(timeout=timeout)
 
 
 class Simulation:
@@ -182,8 +179,8 @@ class Simulation:
         '''
         Object print representation
         '''
-        return f"<{type(self).__qualname__} is {self._state}" \
-            " at {self._rate} at {hex(id(self))}>"
+        return f'<{type(self).__qualname__} is {self._state}' \
+            f' at {self._rate} at {hex(id(self))}>'
 
     def on_running(self) -> None:
         '''
@@ -249,8 +246,8 @@ class Simulation:
 
 
 theSimulation: Optional[Simulation] = None  # Simulation()
-# let's try to delay instantiation to ensure that just importing the package
-# does NOT create network resources
+# let's try to delay the instantiation to ensure that just importing the
+# package does NOT create network resources
 
 
 '''

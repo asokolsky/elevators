@@ -1,8 +1,11 @@
 # Simultons Architecture
 
+There is a single [simulation](simulation.md) which provides context for
+[simulton](simulton.md)s.
+
 ## Simulation
 
-Simulation is:
+[Simulation](simulation.md) is:
 
 * a process
 * a FastAPI service
@@ -10,7 +13,7 @@ Simulation is:
 
 ## Simultons
 
-Simulton is:
+[Simulton](simulton.md) is:
 
 * a process
 * a FastAPI service
@@ -18,7 +21,7 @@ Simulton is:
 
 ## Major Design Qs
 
-These popped up within hours: How do I programmatically
+These popped up within hours: How do I programmatically...
 
 * [start the FastAPI server?](./fastapi-start.md)
 * [shut the FastAPI server?](./fastapi-shut.md)

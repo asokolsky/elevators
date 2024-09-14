@@ -33,6 +33,12 @@ class TestClockSimulton(unittest.TestCase):
         Shut the simulton process
         '''
         print('TestClockSimulton.tearDownClass')
+        # request the shutdown
+        cls._service.shutting()
+        #
+        # wait for the process to actually terminate
+        #
+        cls._service.wait_to_die(0.2)
         #
         # shut the simulton process
         #
@@ -66,12 +72,14 @@ class TestClockSimulton(unittest.TestCase):
         return res
 
     def get_time(self, clock_id) -> ClockResponse:
+        assert self.restc is not None
         (status_code, rdata) = self.restc.get(
             f'{clocks_uri}{clock_id}')
         self.assertEqual(status_code, 200)
         return rdata
 
     def get_nonexistent_clock(self) -> None:
+        assert self.restc is not None
         (status_code, rdata) = self.restc.get(
             f'{clocks_uri}1234567890')
         self.assertEqual(status_code, 404)

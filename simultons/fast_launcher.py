@@ -41,7 +41,7 @@ class FastLauncher:
         '_port accessor'
         return self._port
 
-    def launch(self) -> int:
+    def launch(self, stdout=subprocess.PIPE, stderr=subprocess.PIPE) -> int:
         '''
         start the FastAPI service process, returns service process pid
         '''
@@ -53,8 +53,8 @@ class FastLauncher:
         ]
         print('command_line:', command_line)
         self._popen = subprocess.Popen(
-            command_line, cwd=parent_dir,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            command_line, cwd=parent_dir, stdout=stdout, stderr=stderr,
+            text=True)
         return self._popen.pid
 
     def wait_until_reachable(
@@ -86,8 +86,9 @@ class FastLauncher:
                 if x.status_code == 200:
                     # YES!
                     jres = x.json()
-                    print(f'\nwait_until_reachable({url}, {timeout}) => {jres},'
-                          f' after {time.time()-start:.2f} secs')
+                    print(
+                        f'\nwait_until_reachable({url}, {timeout}) => {jres},'
+                        f' after {time.time()-start:.2f} secs')
                     return jres
 
             except httpx.ConnectError:
@@ -106,13 +107,15 @@ class FastLauncher:
         #
         # wait for the process to actually terminate
         #
-        print(f'Waiting for upto {timeout} secs for {self._popen.pid} to die...')
+        print('Waiting for upto', timeout, 'secs for', self._popen.pid,
+              'to die...')
         start = time.time()
         try:
             self._popen.wait(timeout)
             # the process has terminated
             elapsed = time.time() - start
-            print(f'{self._popen.pid} died after {elapsed:.3f} secs, ec: {self._popen.returncode}')
+            print(self._popen.pid, 'died after',  f'{elapsed:.3f}',
+                  'secs, ec:', self._popen.returncode)
             return True
 
         except subprocess.TimeoutExpired:
@@ -147,11 +150,17 @@ class FastLauncher:
             print('Caught while tying to communicate with', self._popen.pid,
                   err)
         dashes = '==========================='
-        print(dashes, self._path, self._popen.pid, 'stdout', dashes, '\n',
-              stdout_value,
-              dashes, self._path, self._popen.pid, 'stderr', dashes, '\n',
-              stderr_value,
-              dashes, self._path, self._popen.pid, 'end', dashes)
+        output_produced = False
+        if stdout_value:
+            print(dashes, self._path, self._popen.pid, 'stdout', dashes, '\n',
+                  stdout_value)
+            output_produced = True
+        if stderr_value:
+            print(dashes, self._path, self._popen.pid, 'stderr', dashes, '\n',
+                  stderr_value)
+            output_produced = True
+        if output_produced:
+            print(dashes, self._path, self._popen.pid, 'end', dashes)
 
         # close the socket
         self._restc.close()
@@ -160,3 +169,26 @@ class FastLauncher:
 
     def get_rest_client(self, verbose: bool, dumpHeaders: bool):
         return rest_client(self._host, self._port, verbose, dumpHeaders)
+
+    def read_stdout(self) -> Optional[int]:
+        '''
+        Capture Python subprocess output in real-time.
+        https://lucadrf.dev/blog/python-subprocess-buffers/
+        Returns:
+         - None if interrupted by KeyboardInterrupt
+         - process exit code otherwise
+        '''
+        dashes = '==========================='
+        assert self._popen is not None
+        print(dashes, self._path, self._popen.pid, 'stdout', dashes)
+        ec = self._popen.poll()
+        while ec is None:
+            try:
+                assert self._popen.stdout is not None
+                line = self._popen.stdout.readline()
+                print(line.rstrip('\r\n '))
+            except KeyboardInterrupt:
+                break
+            ec = self._popen.poll()
+        print(dashes, self._path, self._popen.pid, 'end', dashes)
+        return ec

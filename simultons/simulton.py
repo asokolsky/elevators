@@ -14,17 +14,29 @@ import signal
 import string
 from typing import Any, Dict
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from starlette.background import BackgroundTask
 import zmq
 import zmq.asyncio
 from .globals import simulation_zspec, simulation_ztopic
 from . import SimulationState, SimulationResponse, \
-    SimultonResponse, SimultonState
+    SimultonRequest, SimultonResponse, SimultonState
 
 
 def get_random_id() -> str:
     length = 8
     return ''.join(
         random.choice(string.ascii_lowercase) for _ in range(length))
+
+
+async def shut_the_process():
+    '''
+    This is how we exit FastAPI app
+    '''
+    pid = os.getpid()
+    os.kill(pid, signal.SIGTERM)
+    print(f'SIGTERM sent to {pid}')
+    return
 
 
 class Simulton:
@@ -82,6 +94,7 @@ class Simulton:
             self.state = SimultonState.RUNNING
         elif resp.state == SimulationState.SHUTTING:
             self.state = SimultonState.SHUTTING
+            shut_the_process()
         else:
             assert False
         return
@@ -161,7 +174,6 @@ class Simulton:
         State just transitioned to SHUTTING
         '''
         print('Simulton.on_shutting', self)
-        self.shutdown()
         return
 
     def on_startup(self) -> None:
@@ -178,8 +190,6 @@ class Simulton:
         Simulton FastAPI app shutdown event handler
         '''
         print('Simulton.on_shutdown', self)
-        #if self.state != SimultonState.SHUTTING:
-        #    self.shutdown()
         # close the zmq subscriber
         # https://zguide.zeromq.org/docs/chapter1/#Making-a-Clean-Exit
         # to avoid hanging infinitely
@@ -189,15 +199,6 @@ class Simulton:
             self._zcontext.term()
         except Exception as e:
             print('Caught:', type(e), e)
-        return
-
-    def shutdown(self) -> None:
-        '''
-        REST API handler
-        '''
-        self.state = SimultonState.SHUTTING
-        pid = os.getpid()
-        os.kill(pid, signal.SIGTERM)
         return
 
     def get_new_instance_id(self) -> str:
@@ -232,6 +233,22 @@ class Simulton:
             title=self.title,
             version=self.version)
 
+    def on_put_simulton(self, req: SimultonRequest) -> JSONResponse:
+        '''
+        Handle REST API PUT to change the simulton state
+        '''
+        if req.rate is not None:
+            self.rate = req.rate
+        self.state = req.state
+        if req.state == SimultonState.SHUTTING:
+            background = BackgroundTask(shut_the_process)
+        else:
+            background = None
+        return JSONResponse(
+            status_code=202,
+            content=self.to_response().model_dump(),
+            background=background)
+
 #
 # the derivatives have to have these:
 #
@@ -243,16 +260,16 @@ class Simulton:
 
 # @app.on_event('startup')
 # async def startup_event():
-#     print('simulation startup_event')
 #     global theDerivedSimulton
+#     print('simulton startup_event', theDerivedSimulton)
 #     theDerivedSimulton = DerivedSimulton()
 #     theDerivedSimulton.on_startup()
 #     return
 
 # @app.on_event('shutdown')
 # async def shutdown_event():
-#     print('simulation shutdown_event')
 #     global theDerivedSimulton
+#     print('simulton shutdown_event', theDerivedSimulton)
 #     assert theDerivedSimulton is not None
 #     theDerivedSimulton.on_shutdown()
 #     theDerivedSimulton = None
@@ -265,16 +282,10 @@ class Simulton:
 #    '''
 #    return theDerivedSimulton.to_response()
 
-# @app.put(
-#    '/api/v1/simulton',
-#    response_model=SimultonResponse,
-#    status_code=202,
-#    responses={400: {"model": Message}})
+# @app.put('/api/v1/simulton')
 # async def put_simulton(params: SimultonRequest):
 #    '''
 #    Handle a request to change the simulton state
 #    '''
-#    if req.rate is not None:
-#        theDerivedSimulton.rate = req.rate
-#    theDerivedSimulton.state = req.state
-#    return theDerivedSimulton.to_response()
+#    assert theDerivedSimulton.rate is not None
+#    return theDerivedSimulton.on_put_simulton(req)

@@ -108,7 +108,6 @@ class ClockSimulton(Simulton):
 
 
 theClockSimulton: Optional[ClockSimulton] = None
-
 app = ClockSimulton.create_app()
 
 
@@ -125,6 +124,7 @@ async def startup_event():
 async def shutdown_event():
     global theClockSimulton
     print('clock simulton shutdown_event', theClockSimulton)
+    assert theClockSimulton is not None
     theClockSimulton.on_shutdown()
     theClockSimulton = None
     return
@@ -133,23 +133,18 @@ async def shutdown_event():
 @app.get('/api/v1/simulton', response_model=SimultonResponse)
 async def get_simulton():
     print('get clock simulton')
+    global theClockSimulton
+    assert theClockSimulton is not None
     return theClockSimulton.to_response()
 
 
-@app.put(
-    '/api/v1/simulton',
-    response_model=SimultonResponse,
-    status_code=202,
-    responses={400: {"model": Message}})
+@app.put('/api/v1/simulton')
 async def put_simulton(req: SimultonRequest):
     '''
     Handle a request to change the simulton state
     '''
     assert theClockSimulton is not None
-    if req.rate is not None:
-        theClockSimulton.rate = req.rate
-    theClockSimulton.state = req.state
-    return theClockSimulton.to_response()
+    return theClockSimulton.on_put_simulton(req)
 
 
 @app.get('/api/v1/clocks/', response_model=Dict[str, ClockResponse])
@@ -196,7 +191,7 @@ async def get_clock(id: str):
 @app.delete('/api/v1/clocks/{id}')
 async def delete_clock(id: str):
     '''
-    Get the simulated time
+    Delete the clock
     '''
     assert theClockSimulton is not None
     try:

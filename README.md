@@ -10,7 +10,16 @@ I wanted to:
 It also appeared that [ZeroMQ](https://zeromq.org/) is a perfect fit to make
 things work together.
 
-BTW [simpy](https://simpy.readthedocs.io/en/latest/) is awesome and is highly
-recommended.  It is NOT used in this project.
+Simulton is:
+
+* a simulation entity,
+* which is a separate process,
+* exposing some REST APIs
 
 More [documents](./docs/).
+
+## Unrelated
+
+* [simpy](https://simpy.readthedocs.io/en/latest/) is awesome and is highly
+recommended and is NOT used in this project.
+* our use of term `simulton` is NOT related to https://ogden.eu/simultons/
